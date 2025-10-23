@@ -1,0 +1,3 @@
+[submodule "dependencies/tinyLog"]
+	path = dependencies/tinyLog
+	url = https://github.com/TheRealFirst/tinyLog
