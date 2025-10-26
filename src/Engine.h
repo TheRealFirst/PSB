@@ -2,6 +2,7 @@
 
 #define LOG_DEBUG
 #include <tinyLog/Log.h>
+#include <webgpu/webgpu.h>
 
 namespace PSB
 {
@@ -9,5 +10,9 @@ namespace PSB
 	{
 	public:
 		void Init();
+		void Shutdown();
+
+	private:
+
 	};
 };
