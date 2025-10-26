@@ -1,3 +1,6 @@
 [submodule "dependencies/tinyLog"]
 	path = dependencies/tinyLog
 	url = https://github.com/TheRealFirst/tinyLog
+[submodule "dependencies/glfw"]
+	path = dependencies/glfw
+	url = https://github.com/glfw/glfw
