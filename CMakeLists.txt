@@ -16,6 +16,7 @@ set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(dependencies/glfw)  # defines target: glfw
+add_subdirectory(dependencies/glm)
 
 set(WGPU_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/wgpu" CACHE PATH "Path to wgpu-native package (include/lib/bin)")
 
@@ -45,7 +46,7 @@ file(GLOB_RECURSE PSB_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
 )
 
-add_library(PSB STATIC ${PSB_SOURCES})
+add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Window.h" "src/Core/Window.cpp" "src/Core/Input.h")
 
 target_include_directories(PSB
     PUBLIC
@@ -58,7 +59,17 @@ target_link_libraries(PSB
         tinyLog
         wgpu_native
 	glfw
+	glm
 )        
+
+# Define platform-specific preprocessor symbols for all code that includes PSB
+if(WIN32)
+    target_compile_definitions(PSB PUBLIC PSB_WIN32)
+elseif(APPLE)
+    target_compile_definitions(PSB PUBLIC PSB_MACOS)
+elseif(UNIX)
+    target_compile_definitions(PSB PUBLIC PSB_LINUX)
+endif()
 
 function(PSB_copy_wgpu_runtime target)
   if(WIN32)
