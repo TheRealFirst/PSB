@@ -7,6 +7,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(dependencies/tinyLog)
 
+
+# Build only the library
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
+# Build static (recommended) – set ON to get glfw3.dll instead
+set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(dependencies/glfw)  # defines target: glfw
+
 set(WGPU_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/wgpu" CACHE PATH "Path to wgpu-native package (include/lib/bin)")
 
 add_library(wgpu_native SHARED IMPORTED GLOBAL)
@@ -47,6 +57,7 @@ target_link_libraries(PSB
     PUBLIC
         tinyLog
         wgpu_native
+	glfw
 )        
 
 function(PSB_copy_wgpu_runtime target)
