@@ -2,7 +2,7 @@
 
 #define LOG_DEBUG
 #include <tinyLog/Log.h>
-#include <webgpu/webgpu.h>
+#include <webgpu.h>
 
 namespace PSB
 {
