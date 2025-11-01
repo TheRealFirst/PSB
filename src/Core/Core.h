@@ -2,6 +2,9 @@
 
 #include <memory>
 
+#include <tinyLog\Asserts.h>
+#include <tinyLog\Log.h>
+
 #ifdef PSB_WIN32
 /*
 * #ifdef BUILD_DLL

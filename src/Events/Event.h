@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "../Core/Core.h"
+#include "Core/Core.h"
 
 namespace PSB {
 

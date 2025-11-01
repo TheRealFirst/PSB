@@ -46,7 +46,7 @@ file(GLOB_RECURSE PSB_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
 )
 
-add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Window.h" "src/Core/Window.cpp" "src/Core/Input.h")
+add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Window.h" "src/Core/Window.cpp" "src/Core/Input.h" "src/Core/MouseCodes.h" "src/Core/KeyCodes.h" "src/Events/ApplicationEvent.h" "src/Events/KeyEvent.h" "src/Events/MouseEvent.h" "src/Platform/Windows/WindowsWindow.h" "src/Platform/Windows/WindowsInput.cpp" "src/Core/Application.h" "src/Renderer/GraphicsContext.h" "src/Renderer/GraphicsContext.cpp" "src/Core/Application.cpp")
 
 target_include_directories(PSB
     PUBLIC
