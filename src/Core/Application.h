@@ -4,6 +4,8 @@
 #include "Events\Event.h"
 #include "Events\ApplicationEvent.h"
 
+#include "Core.h"
+#include "Layerstack.h"
 
 #include <tinyLog/Log.h>
 #include <webgpu.h>
@@ -20,6 +22,8 @@
 #include <GLFW/glfw3native.h> // for Cocoa window → CAMetalLayer
 #endif
 
+int main(int argc, char** argv);
+
 namespace PSB
 {
 	class Application
@@ -30,9 +34,13 @@ namespace PSB
 
 		void OnEvent(Event& e);
 
+		void PushLayer(Layer* layer);
+		void PushOverlay(Layer* layer);
+
 		Window& GetWindow() { return *m_Window; }
 
-		void Run();
+
+
 		void Close();
 
 		static Application& Get()
@@ -40,6 +48,7 @@ namespace PSB
 			return *s_Instance;
 		}
 	private:
+		void Run();
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
 
@@ -47,7 +56,14 @@ namespace PSB
 		Scope<Window> m_Window;
 		bool m_Running = true;
 		bool m_Minimized = false;
+
+		float m_LastFrameTime = 0.0f;
+
+		LayerStack m_LayerStack;
 	private:
 		static Application* s_Instance;
+		friend int ::main(int argc, char** argv);
 	};
+
+	Application* CreateApplication();
 }

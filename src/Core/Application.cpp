@@ -14,7 +14,6 @@ namespace PSB
 
 		m_Window = Window::Create();
 		m_Window->SetEventCallback(PSB_BIND_EVENT_FN(Application::OnEvent));
-
 	}
 
 	PSB::Application::~Application()
@@ -28,6 +27,13 @@ namespace PSB
 		EventDispatcher dispatcher(e);
 		dispatcher.Dispatch<WindowResizeEvent>(PSB_BIND_EVENT_FN(Application::OnWindowResize));
 		dispatcher.Dispatch<WindowCloseEvent>(PSB_BIND_EVENT_FN(Application::OnWindowClose));
+
+		for (auto it = m_LayerStack.rbegin(); it != m_LayerStack.rend(); it++)
+		{
+			if (e.Handled)
+				break;
+			(*it)->OnEvent(e);
+		}
 	}
 
 	void PSB::Application::Close()
@@ -39,12 +45,29 @@ namespace PSB
 	{
 		while (m_Running)
 		{
+			float time = (float)glfwGetTime();
+			Timestep timestep = time - m_LastFrameTime;
+			m_LastFrameTime = time;
+
 			if (!m_Minimized) {
-				// Update
+				for (Layer* layer : m_LayerStack)
+					layer->OnUpdate(timestep);
 			}
 
 			m_Window->OnUpdate();
 		}
+	}
+
+	void PSB::Application::PushLayer(Layer* layer)
+	{
+		m_LayerStack.PushLayer(layer);
+		layer->OnAttach();
+	}
+
+	void PSB::Application::PushOverlay(Layer* layer)
+	{
+		m_LayerStack.PushOverlay(layer);
+		layer->OnAttach();
 	}
 
 	bool PSB::Application::OnWindowClose(WindowCloseEvent& e)

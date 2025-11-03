@@ -24,6 +24,8 @@ PSB::WindowsWindow::~WindowsWindow()
 
 void PSB::WindowsWindow::OnUpdate()
 {
+    glfwPollEvents();
+    m_Context->SwapBuffers();
 }
 
 void PSB::WindowsWindow::SetVSync(bool enabled)
