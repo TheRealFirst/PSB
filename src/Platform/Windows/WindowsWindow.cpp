@@ -49,6 +49,7 @@ void PSB::WindowsWindow::Init(const WindowProbs& probs)
 	}
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	m_Window = glfwCreateWindow((int)probs.Width, (int)probs.Height, probs.Title.c_str(), nullptr, nullptr);

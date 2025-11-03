@@ -1,7 +1,8 @@
 #pragma once
 #include "Core\Core.h"
-#include "GLFW\glfw3.h"
-#include "webgpu.h"
+#include <webgpu.h>
+
+struct GLFWwindow;
 
 namespace PSB
 {

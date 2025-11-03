@@ -4,7 +4,7 @@
 #include "Events\Event.h"
 #include "Events\ApplicationEvent.h"
 
-#define LOG_DEBUG
+
 #include <tinyLog/Log.h>
 #include <webgpu.h>
 
@@ -32,6 +32,7 @@ namespace PSB
 
 		Window& GetWindow() { return *m_Window; }
 
+		void Run();
 		void Close();
 
 		static Application& Get()
@@ -39,7 +40,6 @@ namespace PSB
 			return *s_Instance;
 		}
 	private:
-		void Run();
 		bool OnWindowClose(WindowCloseEvent& e);
 		bool OnWindowResize(WindowResizeEvent& e);
 
