@@ -8,6 +8,7 @@ namespace PSB
 {
 	class WindowsWindow : public Window
 	{
+	public:
 		WindowsWindow(const WindowProbs& probs);
 		virtual ~WindowsWindow();
 

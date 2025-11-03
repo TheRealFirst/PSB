@@ -18,9 +18,10 @@ namespace PSB
 		WGPUAdapter RequestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const* options);
 		WGPUDevice RequestDeviceSync(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
 	private:
-		WGPUAdapter m_Adapter;
-		WGPUDevice m_Device;
-		WGPUQueue m_Queue;
-		GLFWwindow* m_WindowHandle;
+		WGPUInstance m_Instance = nullptr;
+		WGPUAdapter m_Adapter = nullptr;
+		WGPUDevice m_Device = nullptr;
+		WGPUQueue m_Queue = nullptr;
+		GLFWwindow* m_WindowHandle = nullptr;
 	};
 }

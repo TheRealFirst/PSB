@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "Core/Core.h"
+#include "ostream"
 
 namespace PSB {
 

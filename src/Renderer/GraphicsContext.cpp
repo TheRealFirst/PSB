@@ -11,13 +11,13 @@ void PSB::GraphicsContext::Init()
 	WGPUInstanceDescriptor desc = {};
 	desc.nextInChain = nullptr;
 
-	WGPUInstance instance = wgpuCreateInstance(&desc);
+	m_Instance = wgpuCreateInstance(&desc);
 
 	
-	LOG_ASSERT(instance, "Could not initialize WGPU!");
+	LOG_ASSERT(m_Instance && "Could not initialize WGPU!");
 	
 
-	LOG_DEBUG("WGPU Instance: " + instance);
+	LOG_DEBUG("WGPU Instance: " + m_Instance);
 
 	glfwMakeContextCurrent(m_WindowHandle);
 
@@ -25,11 +25,11 @@ void PSB::GraphicsContext::Init()
 
 	WGPURequestAdapterOptions adapterOpts = {};
 	adapterOpts.nextInChain = nullptr;
-	m_Adapter = RequestAdapterSync(instance, &adapterOpts);
+	m_Adapter = RequestAdapterSync(m_Instance, &adapterOpts);
 
 	LOG_DEBUG("Got adapter: " + m_Adapter);
 
-	wgpuInstanceRelease(instance);
+	wgpuInstanceRelease(m_Instance);
 
 	LOG_DEBUG("Requesting WGPUDevice...");
 
@@ -62,69 +62,40 @@ void PSB::GraphicsContext::SwapBuffers()
 
 WGPUAdapter PSB::GraphicsContext::RequestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const* options)
 {
-	struct UserData {
-		WGPUAdapter adapter = nullptr;
-		bool requestEnded = false;
-	};
-	UserData userData;
+	WGPUAdapter outAdapter = nullptr;
 
-	auto onAdapterRequestEnded = [](WGPURequestAdapterStatus status, WGPUAdapter adapter, char const* message, void* pUserData)
-		{
-			UserData& userData = *reinterpret_cast<UserData*>(pUserData);
-			if (status == WGPURequestAdapterStatus_Success)
-			{
-				userData.adapter = adapter;
-			}
-			else {
-
-				LOG_FATAL("Could not get WebGPU adapter.");
-				LOG_FATAL(message);
-			}
-			userData.requestEnded = true;
+	WGPURequestAdapterCallbackInfo acb{};
+	acb.mode = WGPUCallbackMode_WaitAnyOnly;
+	acb.callback = (WGPURequestAdapterCallback)
+		+[](WGPURequestAdapterStatus s, WGPUAdapter a, const char*, void* u) {
+		if (s == WGPURequestAdapterStatus_Success)
+			*reinterpret_cast<WGPUAdapter*>(u) = a;
 		};
+	acb.userdata1 = &outAdapter;
 
-	wgpuInstanceRequestAdapter(
-		instance /* equivalent of navigator.gpu */,
-		options,
-		onAdapterRequestEnded,
-		(void*)&userData
-	);
+	WGPUFuture af = wgpuInstanceRequestAdapter(instance, options, acb);
+	WGPUFutureWaitInfo awaitA{ .future = af };
+	wgpuInstanceWaitAny(instance, 1, &awaitA, 0);
 
-	LOG_ASSERT(userData.requestEnded);
-
-
-	return userData.adapter;
+	return outAdapter;
 }
 
 WGPUDevice PSB::GraphicsContext::RequestDeviceSync(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor)
 {
-	struct UserData {
-		WGPUDevice device = nullptr;
-		bool requestEnded = false;
-	};
-	UserData userData;
+	WGPUDevice outDevice = nullptr;
 
-	auto onDeviceRequestEnded = [](WGPURequestDeviceStatus status, WGPUDevice device, char const* message, void* pUserData) {
-		UserData& userData = *reinterpret_cast<UserData*>(pUserData);
-		if (status == WGPURequestDeviceStatus_Success) {
-			userData.device = device;
-		}
-		else {
-			LOG_FATAL("Could not get WebGPU device: ");
-			LOG_FATAL(message);
-		}
-		userData.requestEnded = true;
+	WGPURequestDeviceCallbackInfo dcb{};
+	dcb.mode = WGPUCallbackMode_WaitAnyOnly;
+	dcb.callback = (WGPURequestDeviceCallback)
+		+[](WGPURequestDeviceStatus s, WGPUDevice d, const char*, void* u) {
+		if (s == WGPURequestDeviceStatus_Success)
+			*reinterpret_cast<WGPUDevice*>(u) = d;
 		};
+	dcb.userdata1 = &outDevice;
 
-	wgpuAdapterRequestDevice(
-		adapter,
-		descriptor,
-		onDeviceRequestEnded,
-		(void*)&userData
-	);
+	WGPUFuture df = wgpuAdapterRequestDevice(m_Adapter, descriptor, dcb);
+	WGPUFutureWaitInfo awaitD{ .future = df };
+	wgpuInstanceWaitAny(m_Instance, 1, &awaitD, 0);
 
-
-	LOG_ASSERT(userData.requestEnded);
-
-	return userData.device;
+	return outDevice;
 }

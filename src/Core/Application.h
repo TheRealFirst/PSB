@@ -24,6 +24,7 @@ namespace PSB
 {
 	class Application
 	{
+	public:
 		Application();
 		virtual ~Application();
 
