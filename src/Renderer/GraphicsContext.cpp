@@ -1,16 +1,17 @@
 #include "GraphicsContext.h"
 
-// Must be defined BEFORE any GLFW include to get native Win32 helpers
-#define GLFW_EXPOSE_NATIVE_WIN32
+#include "Core\Application.h"
+
 #include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
+#include <webgpu.h>
+
+#include <glfw3webgpu.h>
 
 // Ensure the Windows-specific structs are enabled in webgpu.h
 #ifndef WGPU_TARGET_WINDOWS
 #define WGPU_TARGET_WINDOWS 1
 #endif
 #include <Windows.h>
-#include <webgpu.h>
 
 PSB::GraphicsContext::GraphicsContext(GLFWwindow* windowHandle) : m_WindowHandle(windowHandle)
 {
@@ -26,8 +27,28 @@ void PSB::GraphicsContext::Init()
     LOG_DEBUG("WGPU Instance created");
 
     LOG_DEBUG("Requesting WGPUAdapter...");
-    WGPURequestAdapterOptions adapterOpts{};       // no surface
+
+    m_Surface = glfwGetWGPUSurface(m_Instance, m_WindowHandle);
+
+    m_Config.nextInChain = nullptr;
+    m_Config.width = Application::Get().GetWindow().GetWidth();
+    m_Config.height = Application::Get().GetWindow().GetHeight();
+
+    WGPUSurfaceCapabilities caps{};
+    wgpuSurfaceGetCapabilities(m_Surface, m_Adapter, &caps);
+
+    WGPUTextureFormat surfaceFormat = caps.formats[0];
+
+    m_Config.format = surfaceFormat;
+    m_Config.viewFormatCount = 0;
+    m_Config.viewFormats = nullptr;
+    
+    wgpuSurfaceConfigure(m_Surface, &m_Config);
+
+    WGPURequestAdapterOptions adapterOpts{};      
+    adapterOpts.nextInChain = nullptr;
     adapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
+    adapterOpts.compatibleSurface = m_Surface;
 
     m_Adapter = RequestAdapterSync(m_Instance, &adapterOpts);
     LOG_ASSERT(m_Adapter);
@@ -35,6 +56,7 @@ void PSB::GraphicsContext::Init()
 
     LOG_DEBUG("Requesting WGPUDevice...");
     WGPUDeviceDescriptor deviceDesc{};
+
     m_Device = RequestDeviceSync(m_Adapter, &deviceDesc);
     LOG_ASSERT(m_Device);
     LOG_DEBUG("Got device.");
@@ -49,6 +71,8 @@ void PSB::GraphicsContext::Delete()
     if (m_Device) { wgpuDeviceRelease(m_Device); m_Device = nullptr; }
     if (m_Adapter) { wgpuAdapterRelease(m_Adapter); m_Adapter = nullptr; }
     if (m_Instance) { wgpuInstanceRelease(m_Instance); m_Instance = nullptr; }
+    wgpuSurfaceUnconfigure(m_Surface);
+    wgpuSurfaceRelease(m_Surface);
 }
 
 void PSB::GraphicsContext::SwapBuffers()

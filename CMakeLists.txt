@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(PSB LANGUAGES CXX)
+project(PSB LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -37,10 +37,21 @@ add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Layer.h" "src/Core/Layer.cpp" "s
 
 target_include_directories(PSB PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
-  ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glm)   # glm is header-only
+  ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glm   # glm is header-only
+  ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glfw3webgpu/include)
+
+
+add_library(webgpu INTERFACE)
+target_include_directories(webgpu INTERFACE "${WGPU_DIR}/include")
+target_link_libraries(webgpu INTERFACE wgpu_native)
+
+add_subdirectory(dependencies/glfw3webgpu)
 
 # Core deps for consumers (Sample inherits these)
-target_link_libraries(PSB PUBLIC tinyLog wgpu_native glfw)
+target_link_libraries(PSB PUBLIC tinyLog wgpu_native glfw glfw3webgpu)
+# target_copy_webgpu_binaries(PSB)
+
+target_compile_definitions(PSB PUBLIC WEBGPU_BACKEND_WGPU=1)
 
 # Platform defines
 if (WIN32)

@@ -6,7 +6,7 @@ extern PSB::Application* PSB::CreateApplication();
 
 int main(int argc, char** argv)
 {
-	auto app = Engine::CreateApplication();
+	auto app = PSB::CreateApplication();
 	app->Run();
 	delete app;
 }

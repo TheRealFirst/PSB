@@ -24,5 +24,7 @@ namespace PSB
 		WGPUDevice m_Device = nullptr;
 		WGPUQueue m_Queue = nullptr;
 		GLFWwindow* m_WindowHandle = nullptr;
+		WGPUSurface m_Surface = nullptr;
+		WGPUSurfaceConfiguration m_Config = {};
 	};
 }

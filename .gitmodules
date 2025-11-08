@@ -7,3 +7,6 @@
 [submodule "dependencies/glm"]
 	path = dependencies/glm
 	url = https://github.com/g-truc/glm
+[submodule "dependencies/glfw3webgpu"]
+	path = dependencies/glfw3webgpu
+	url = https://github.com/eliemichel/glfw3webgpu
