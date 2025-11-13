@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(dependencies/tinyLog)
+add_subdirectory(dependencies/webgpu)
 
 # GLFW static
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -13,20 +14,6 @@ set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)
 add_subdirectory(dependencies/glfw)  # target: glfw
 
-# WebGPU native import
-set(WGPU_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/wgpu" CACHE PATH "Path to wgpu-native package (include/lib/bin)")
-add_library(wgpu_native SHARED IMPORTED GLOBAL)
-if (WIN32)
-  set_target_properties(wgpu_native PROPERTIES
-    IMPORTED_LOCATION "${WGPU_DIR}/bin/wgpu_native.dll"
-    IMPORTED_IMPLIB   "${WGPU_DIR}/lib/wgpu_native.lib")
-elseif(APPLE)
-  set_target_properties(wgpu_native PROPERTIES
-    IMPORTED_LOCATION "${WGPU_DIR}/lib/libwgpu_native.dylib")
-else()
-  # set_target_properties(wgpu_native PROPERTIES IMPORTED_LOCATION "${WGPU_DIR}/lib/libwgpu_native.so")
-endif()
-target_include_directories(wgpu_native INTERFACE "${WGPU_DIR}/include")
 
 # Sources
 file(GLOB_RECURSE PSB_SOURCES CONFIGURE_DEPENDS
@@ -41,17 +28,17 @@ target_include_directories(PSB PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glfw3webgpu/include)
 
 
-add_library(webgpu INTERFACE)
-target_include_directories(webgpu INTERFACE "${WGPU_DIR}/include")
-target_link_libraries(webgpu INTERFACE wgpu_native)
 
 add_subdirectory(dependencies/glfw3webgpu)
 
 # Core deps for consumers (Sample inherits these)
-target_link_libraries(PSB PUBLIC tinyLog wgpu_native glfw glfw3webgpu)
+target_link_libraries(PSB PUBLIC tinyLog webgpu glfw glfw3webgpu)
 # target_copy_webgpu_binaries(PSB)
 
 target_compile_definitions(PSB PUBLIC WEBGPU_BACKEND_WGPU=1)
+if (WIN32)
+  target_compile_definitions(glfw3webgpu PRIVATE GLFW_EXPOSE_NATIVE_WIN32=1)
+endif()
 
 # Platform defines
 if (WIN32)
@@ -75,11 +62,13 @@ if (WIN32)
   )
 endif()
 
-# Runtime copy helper (call this from the executable's CMake)
+TARGET_COPY_WEBGPU_BINARIES(PSB)
+
 function(PSB_copy_wgpu_runtime target)
-  if (WIN32 OR APPLE)
+  if(WIN32 OR APPLE)
     add_custom_command(TARGET ${target} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:wgpu_native>" "$<TARGET_FILE_DIR:${target}>"
-      COMMENT "[PSB] Copied wgpu_native runtime to $<TARGET_FILE_DIR:${target}>")
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "$<TARGET_FILE:webgpu>"
+              "$<TARGET_FILE_DIR:${target}>")
   endif()
 endfunction()

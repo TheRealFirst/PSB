@@ -43,6 +43,10 @@ void PSB::WindowsWindow::Init(const WindowProbs& probs)
 	m_Data.Width = probs.Width;
 	m_Data.Height = probs.Height;
 
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
 	if (s_GLFWWindowCount == 0)
 	{
 		int success = glfwInit();
@@ -50,15 +54,11 @@ void PSB::WindowsWindow::Init(const WindowProbs& probs)
 		glfwSetErrorCallback(GLFWErrorCallback);
 	}
 
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
 	m_Window = glfwCreateWindow((int)probs.Width, (int)probs.Height, probs.Title.c_str(), nullptr, nullptr);
 	++s_GLFWWindowCount;
 
 	m_Context = CreateScope<GraphicsContext>(m_Window);
-	m_Context->Init();
+	m_Context->Init(m_Data.Width, m_Data.Height);
 
 
 	if (m_Window == NULL)

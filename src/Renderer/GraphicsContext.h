@@ -1,6 +1,6 @@
 #pragma once
 #include "Core\Core.h"
-#include <webgpu.h>
+#include <webgpu/webgpu.h>
 
 struct GLFWwindow;
 
@@ -12,12 +12,13 @@ namespace PSB
 		GraphicsContext(GLFWwindow* windowHandle);
 		~GraphicsContext() = default;
 
-		void Init();
+		void Init(uint32_t width, uint32_t height);
 		void Delete();
 		void SwapBuffers();
 	private:
 		WGPUAdapter RequestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const* options);
 		WGPUDevice RequestDeviceSync(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
+		std::pair<WGPUSurfaceTexture, WGPUTextureView> GetNextSurfaceViewData();
 	private:
 		WGPUInstance m_Instance = nullptr;
 		WGPUAdapter m_Adapter = nullptr;
@@ -25,6 +26,6 @@ namespace PSB
 		WGPUQueue m_Queue = nullptr;
 		GLFWwindow* m_WindowHandle = nullptr;
 		WGPUSurface m_Surface = nullptr;
-		WGPUSurfaceConfiguration m_Config = {};
+		WGPUSurfaceConfiguration m_Config{};
 	};
 }

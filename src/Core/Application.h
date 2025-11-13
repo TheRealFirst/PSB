@@ -8,7 +8,7 @@
 #include "Layerstack.h"
 
 #include <tinyLog/Log.h>
-#include <webgpu.h>
+#include <webgpu/webgpu.h>
 
 #define GLFW_INCLUDE_NONE
 #include "GLFW\glfw3.h"

@@ -33,7 +33,8 @@ namespace PSB
 		struct WindowData
 		{
 			std::string Title;
-			uint32_t Width, Height;
+			uint32_t Width = 3840;
+			uint32_t Height = 2160;
 			bool VSync = true;
 
 			EventCallbackFn EventCallback;
