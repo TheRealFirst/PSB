@@ -4,6 +4,7 @@
 
 #include "Events\Event.h"
 #include "Core.h"
+#include "Renderer\GraphicsContext.h"
 
 namespace PSB
 {

@@ -7,6 +7,8 @@
 #include "Core.h"
 #include "Layerstack.h"
 
+#include "Renderer\Renderer.h"
+
 #include <tinyLog/Log.h>
 #include <webgpu/webgpu.h>
 
@@ -39,7 +41,7 @@ namespace PSB
 
 		Window& GetWindow() { return *m_Window; }
 
-
+		Ref<GraphicsContext> GetContext() { return m_Context; }
 
 		void Close();
 
@@ -60,6 +62,8 @@ namespace PSB
 		float m_LastFrameTime = 0.0f;
 
 		LayerStack m_LayerStack;
+
+		Ref<GraphicsContext> m_Context;
 	private:
 		static Application* s_Instance;
 		friend int ::main(int argc, char** argv);

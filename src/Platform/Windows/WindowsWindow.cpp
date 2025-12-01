@@ -3,6 +3,7 @@
 #include "Events\ApplicationEvent.h"
 #include "Events\KeyEvent.h"
 #include "Events\MouseEvent.h"
+#include "Core\Application.h"
 
 static uint8_t s_GLFWWindowCount = 0;
 
@@ -14,6 +15,7 @@ static void GLFWErrorCallback(int error, const char* description)
 
 PSB::WindowsWindow::WindowsWindow(const WindowProbs& probs)
 {
+    m_Context = Application::Get().GetContext();
     Init(probs);
 }
 

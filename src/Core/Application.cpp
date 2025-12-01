@@ -12,6 +12,8 @@ namespace PSB
 
 		s_Instance = this;
 
+		WindowProbs probs;
+
 		m_Window = Window::Create();
 		m_Window->SetEventCallback(PSB_BIND_EVENT_FN(Application::OnEvent));
 	}
