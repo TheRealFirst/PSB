@@ -9,17 +9,9 @@
 #include <webgpu/webgpu.h>
 #include <webgpu/wgpu.h>
 
-const char* shaderSource = R"(
-@vertex
-fn vs_main(@location(0) in_vertex_position: vec2f) -> @builtin(position) vec4f {
-	return vec4f(in_vertex_position, 0.0, 1.0);
-}
+#include "AssetManagement\AssetManager.h"
+#include "RendererUtils.h"
 
-@fragment
-fn fs_main() -> @location(0) vec4f {
-	return vec4f(0.0, 0.4, 1.0, 1.0);
-}
-)";
 
 PSB::GraphicsContext::GraphicsContext()
 {
@@ -59,13 +51,15 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
     deviceDesc.requiredFeatureCount = 0;
     deviceDesc.requiredLimits = nullptr;
     deviceDesc.defaultQueue.nextInChain = nullptr;
-    deviceDesc.defaultQueue.label = "the default queue";
+    deviceDesc.defaultQueue.label = "the default queue";{}
 
-    deviceDesc.deviceLostCallback = [](WGPUDeviceLostReason reason, char const* message, void* /* pUserData */) {
-        std::cout << "Device lost: reason " << reason;
-        if (message) std::cout << " (" << message << ")";
-        std::cout << std::endl;
-        };
+	deviceDesc.deviceLostCallback = [](WGPUDeviceLostReason reason,
+		char const* message,
+		void* /* pUserData */) {
+			std::cout << "Device lost: reason " << reason;
+			if (message) std::cout << " (" << message << ")";
+			std::cout << std::endl;
+		};
 
     m_Device = RequestDeviceSync(m_Adapter, &deviceDesc);
     LOG_ASSERT(m_Device);
@@ -116,6 +110,7 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
 
     InitializePipeline();
     InitializeBuffers();
+    InitializeBindGroups();
 }
 
 void PSB::GraphicsContext::Delete()
@@ -127,10 +122,17 @@ void PSB::GraphicsContext::Delete()
     wgpuSurfaceUnconfigure(m_Surface);
     wgpuSurfaceRelease(m_Surface);
     wgpuRenderPipelineRelease(m_Pipeline);
+	wgpuPipelineLayoutRelease(m_Layout);
+	wgpuBindGroupLayoutRelease(m_BindGroupLayout);
+    wgpuBindGroupRelease(m_BindGroup);
 }
 
 void PSB::GraphicsContext::SwapBuffers()
 {
+	float time = static_cast<float>(glfwGetTime());
+	// Only update the 1-st float of the buffer
+	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, offsetof(MyUniforms, time), &time, sizeof(float));
+
     auto [surfaceTexture, targetView] = GetNextSurfaceViewData();
     if (!targetView) return;
 
@@ -151,8 +153,13 @@ void PSB::GraphicsContext::SwapBuffers()
     WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &m_RenderPassDesc);
 
     wgpuRenderPassEncoderSetPipeline(renderPass, m_Pipeline);
-    wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, m_VertexBuffer, 0, wgpuBufferGetSize(m_VertexBuffer));
-    wgpuRenderPassEncoderDraw(renderPass, m_VertexCount, 1, 0, 0);
+    
+    m_VertexBuffer.Bind(renderPass, 0);
+    m_IndexBuffer.Bind(renderPass);
+
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 0, nullptr);
+
+    wgpuRenderPassEncoderDrawIndexed(renderPass, m_IndexCount, 1, 0, 0, 0);
 
     wgpuRenderPassEncoderEnd(renderPass);
     wgpuRenderPassEncoderRelease(renderPass);
@@ -270,39 +277,34 @@ std::pair<WGPUSurfaceTexture, WGPUTextureView> PSB::GraphicsContext::GetNextSurf
 
 void PSB::GraphicsContext::InitializePipeline()
 {
-    // Load the shader module
-    WGPUShaderModuleDescriptor shaderDesc{};
-    #ifdef WEBGPU_BACKEND_WGPU
-    shaderDesc.hintCount = 0;
-    shaderDesc.hints = nullptr;
-    #endif
+    WGPUShaderModule shaderModule = AssetManager::LoadShaderModule(RESOURCE_DIR "/shader.wgsl", m_Device);
 
-    // We use the extension mechanism to specify the WGSL part of the shader module descriptor
-    WGPUShaderModuleWGSLDescriptor shaderCodeDesc{};
-    // Set the chained struct's header
-    shaderCodeDesc.chain.next = nullptr;
-    shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-    // Connect the chain
-    shaderDesc.nextInChain = &shaderCodeDesc.chain;
-    shaderCodeDesc.code = shaderSource;
-    WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(m_Device, &shaderDesc);
+    if (shaderModule == nullptr) {
+        LOG_ERROR("Could not load shader!");
+        exit(1);
+    }
 
     // Create the render pipeline
     WGPURenderPipelineDescriptor pipelineDesc{};
     pipelineDesc.nextInChain = nullptr;
 
     WGPUVertexBufferLayout vertexBufferLayout{};
-    WGPUVertexAttribute positionAttrib;
+    
+    std::vector<WGPUVertexAttribute> vertexAttribs(2);
 
-    positionAttrib.shaderLocation = 0;
-    positionAttrib.format = WGPUVertexFormat_Float32x2;
-    positionAttrib.offset = 0;
+    vertexAttribs[0].shaderLocation = 0;
+    vertexAttribs[0].format = WGPUVertexFormat_Float32x2;
+    vertexAttribs[0].offset = 0;
+
+    vertexAttribs[1].shaderLocation = 1;
+    vertexAttribs[1].format = WGPUVertexFormat_Float32x3;
+    vertexAttribs[1].offset = 2 * sizeof(float);
 
 
-    vertexBufferLayout.attributeCount = 1;
-    vertexBufferLayout.attributes = &positionAttrib;
+    vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
+    vertexBufferLayout.attributes = vertexAttribs.data();
 
-    vertexBufferLayout.arrayStride = 2 * sizeof(float);
+    vertexBufferLayout.arrayStride = 5 * sizeof(float);
     vertexBufferLayout.stepMode = WGPUVertexStepMode_Vertex;
 
     // We do not use any vertex buffer for this first simplistic example
@@ -373,7 +375,30 @@ void PSB::GraphicsContext::InitializePipeline()
     // Default value as well (irrelevant for count = 1 anyways)
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-    pipelineDesc.layout = nullptr;
+    WGPUBindGroupLayoutEntry bindingLayout;
+    setDefault(bindingLayout);
+
+    bindingLayout.binding = 0;
+
+    bindingLayout.visibility = WGPUShaderStage_Vertex | WGPUShaderStage_Fragment;
+    bindingLayout.buffer.type = WGPUBufferBindingType_Uniform;
+    bindingLayout.buffer.minBindingSize = sizeof(MyUniforms);
+    bindingLayout.buffer.hasDynamicOffset = true;
+
+    WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc{};
+    bindGroupLayoutDesc.nextInChain = nullptr;
+    bindGroupLayoutDesc.entryCount = 1;
+    bindGroupLayoutDesc.entries = &bindingLayout;
+    m_BindGroupLayout = wgpuDeviceCreateBindGroupLayout(m_Device, &bindGroupLayoutDesc);
+
+    WGPUPipelineLayoutDescriptor layoutDesc{};
+    layoutDesc.nextInChain = nullptr;
+    layoutDesc.bindGroupLayoutCount = 1;
+    layoutDesc.bindGroupLayouts = &m_BindGroupLayout;
+    m_Layout = wgpuDeviceCreatePipelineLayout(m_Device, &layoutDesc);
+
+
+    pipelineDesc.layout = m_Layout;
 
     m_Pipeline = wgpuDeviceCreateRenderPipeline(m_Device, &pipelineDesc);
 
@@ -381,40 +406,6 @@ void PSB::GraphicsContext::InitializePipeline()
     wgpuShaderModuleRelease(shaderModule);
 }
 
-void setDefault(WGPULimits& limits) {
-    limits.maxTextureDimension1D = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxTextureDimension2D = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxTextureDimension3D = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxTextureArrayLayers = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxBindGroups = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxBindGroupsPlusVertexBuffers = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxBindingsPerBindGroup = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxDynamicUniformBuffersPerPipelineLayout = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxDynamicStorageBuffersPerPipelineLayout = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxSampledTexturesPerShaderStage = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxSamplersPerShaderStage = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxStorageBuffersPerShaderStage = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxStorageTexturesPerShaderStage = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxUniformBuffersPerShaderStage = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxUniformBufferBindingSize = WGPU_LIMIT_U64_UNDEFINED;
-    limits.maxStorageBufferBindingSize = WGPU_LIMIT_U64_UNDEFINED;
-    limits.minUniformBufferOffsetAlignment = WGPU_LIMIT_U32_UNDEFINED;
-    limits.minStorageBufferOffsetAlignment = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxVertexBuffers = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxBufferSize = WGPU_LIMIT_U64_UNDEFINED;
-    limits.maxVertexAttributes = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxVertexBufferArrayStride = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxInterStageShaderComponents = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxInterStageShaderVariables = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxColorAttachments = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxColorAttachmentBytesPerSample = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxComputeWorkgroupStorageSize = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxComputeInvocationsPerWorkgroup = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxComputeWorkgroupSizeX = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxComputeWorkgroupSizeY = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxComputeWorkgroupSizeZ = WGPU_LIMIT_U32_UNDEFINED;
-    limits.maxComputeWorkgroupsPerDimension = WGPU_LIMIT_U32_UNDEFINED;
-}
 
 WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) const
 {
@@ -422,17 +413,30 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     supportedLimits.nextInChain = nullptr;
     wgpuAdapterGetLimits(adapter, &supportedLimits);
 
+    wgpuDeviceGetLimits(m_Device, &supportedLimits);
+    WGPULimits deviceLimits = supportedLimits.limits;
+
+    uint32_t uniformStride = ceilToNextMultiple((uint32_t)sizeof(MyUniforms),
+        (uint32_t)deviceLimits.minUniformBufferOffsetAlignment);
+
     WGPURequiredLimits requiredLimits{};
     setDefault(requiredLimits.limits);
 
     // We use at most 1 vertex attribute for now
-    requiredLimits.limits.maxVertexAttributes = 1;
+    requiredLimits.limits.maxVertexAttributes = 2;
     // We should also tell that we use 1 vertex buffers
     requiredLimits.limits.maxVertexBuffers = 1;
     // Maximum size of a buffer is 6 vertices of 2 float each
-    requiredLimits.limits.maxBufferSize = 6 * 2 * sizeof(float);
+    requiredLimits.limits.maxBufferSize = 6 * 5 * sizeof(float);
     // Maximum stride between 2 consecutive vertices in the vertex buffer
-    requiredLimits.limits.maxVertexBufferArrayStride = 2 * sizeof(float);
+    requiredLimits.limits.maxVertexBufferArrayStride = 5 * sizeof(float);
+
+    requiredLimits.limits.maxInterStageShaderComponents = 3;
+
+    requiredLimits.limits.maxBindGroups = 1;
+    requiredLimits.limits.maxUniformBuffersPerShaderStage = 1;
+    requiredLimits.limits.maxUniformBufferBindingSize = 16 * 4;
+    requiredLimits.limits.maxDynamicUniformBuffersPerPipelineLayout = 1;
 
     // These two limits are different because they are "minimum" limits,
     // they are the only ones we are may forward from the adapter's supported
@@ -440,31 +444,64 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     requiredLimits.limits.minUniformBufferOffsetAlignment = supportedLimits.limits.minUniformBufferOffsetAlignment;
     requiredLimits.limits.minStorageBufferOffsetAlignment = supportedLimits.limits.minStorageBufferOffsetAlignment;
 
+
     return requiredLimits;
     
 }
 
 void PSB::GraphicsContext::InitializeBuffers()
 {
-    std::vector<float> vertexData = {
-        // Define a first triangle:
-        -0.5, -0.5,
-        +0.5, -0.5,
-        +0.0, +0.5,
+    std::vector<float> pointData;
 
-        // Add a second triangle:
-        -0.55f, -0.5,
-        -0.05f, +0.5,
-        -0.55f, +0.5
-    };
-    m_VertexCount = static_cast<uint32_t>(vertexData.size() / 2);
+    std::vector<uint32_t> indexData;
 
-    WGPUBufferDescriptor bufferDesc{};
-    bufferDesc.nextInChain = nullptr;
-    bufferDesc.size = vertexData.size() * sizeof(float);
-    bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
-    bufferDesc.mappedAtCreation = false;
-    m_VertexBuffer = wgpuDeviceCreateBuffer(m_Device, &bufferDesc);
+    
 
-    wgpuQueueWriteBuffer(m_Queue, m_VertexBuffer, 0, vertexData.data(), bufferDesc.size);
+    bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/webgpu.txt", pointData, indexData);
+
+    if (!success) {
+        LOG_ERROR("Could not load geometry!");
+        exit(1);
+    }
+
+    m_VertexCount = static_cast<uint32_t>(pointData.size() / 5);
+
+    m_IndexCount = static_cast<uint32_t>(indexData.size());
+   
+    m_VertexBuffer = VertexBuffer(m_Device, m_Queue, pointData.data(), pointData.size() * sizeof(float));
+
+    m_IndexBuffer = IndexBuffer(m_Device, m_Queue, indexData.data(), indexData.size() * sizeof(uint32_t));
+
+	WGPUBufferDescriptor bufferDesc{};
+	bufferDesc.nextInChain = nullptr;
+	bufferDesc.size = sizeof(MyUniforms);
+	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform; // Vertex usage here!
+	bufferDesc.mappedAtCreation = false;
+    m_UniformBuffer = wgpuDeviceCreateBuffer(m_Device, &bufferDesc);
+
+    MyUniforms uniforms;
+    uniforms.time = 1.0f;
+    uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
+	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, 0, &uniforms, sizeof(MyUniforms));
+}
+
+void PSB::GraphicsContext::InitializeBindGroups()
+{
+	WGPUBindGroupEntry binding{};
+	binding.nextInChain = nullptr;
+
+	binding.binding = 0;
+	binding.buffer = m_UniformBuffer;
+
+	binding.offset = 0;
+	binding.size = sizeof(MyUniforms);
+
+
+	WGPUBindGroupDescriptor bindGroupDesc{};
+	bindGroupDesc.nextInChain = nullptr;
+	bindGroupDesc.layout = m_BindGroupLayout;
+
+	bindGroupDesc.entryCount = 1;
+	bindGroupDesc.entries = &binding;
+	m_BindGroup = wgpuDeviceCreateBindGroup(m_Device, &bindGroupDesc);
 }

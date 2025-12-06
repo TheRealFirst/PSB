@@ -15,12 +15,13 @@ set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)
 add_subdirectory(dependencies/glfw)  # target: glfw
 
 
+
 # Sources
 file(GLOB_RECURSE PSB_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
 
-add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Layer.h" "src/Core/Layer.cpp" "src/Core/Timestep.h" "src/Core/Layerstack.h" "src/Core/Layerstack.cpp" "src/Core/EntryPoint.h" "src/Renderer/Renderer.h" "src/Renderer/Renderer.cpp" "src/Renderer/Renderer2D.h" "src/Renderer/Renderer2D.cpp" "src/Renderer/Buffers/VertexBuffer.h" "src/Renderer/Buffers/VertexBuffer.cpp")
+add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Layer.h" "src/Core/Layer.cpp" "src/Core/Timestep.h" "src/Core/Layerstack.h" "src/Core/Layerstack.cpp" "src/Core/EntryPoint.h" "src/Renderer/Renderer.h" "src/Renderer/Renderer.cpp" "src/Renderer/Renderer2D.h" "src/Renderer/Renderer2D.cpp" "src/Renderer/Buffers/VertexBuffer.h" "src/Renderer/Buffers/VertexBuffer.cpp" "src/Renderer/Buffers/IndexBuffer.h" "src/Renderer/Buffers/IndexBuffer.cpp" "src/AssetManagement/AssetManager.h" "src/AssetManagement/AssetManager.cpp" "src/Renderer/RendererUtils.h" "src/Renderer/RendererUtils.cpp")
 
 target_include_directories(PSB PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -60,6 +61,25 @@ if (WIN32)
     runtimeobject  # RoOriginateErrorW
     opengl32       # wgl* referenced by GLES path
   )
+endif()
+
+
+
+option(DEV_MODE "Set up development helper settings" ON)
+
+if(DEV_MODE)
+    # In dev mode, we load resources from the source tree, so that when we
+    # dynamically edit resources (like shaders), these are correctly
+    # versionned.
+    target_compile_definitions(PSB PRIVATE
+        RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"
+    )
+else()
+    # In release mode, we just load resources relatively to wherever the
+    # executable is launched from, so that the binary is portable
+    target_compile_definitions(PSB PRIVATE
+        RESOURCE_DIR="./resources"
+    )
 endif()
 
 TARGET_COPY_WEBGPU_BINARIES(PSB)
