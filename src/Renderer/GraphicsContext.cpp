@@ -49,7 +49,8 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
     deviceDesc.nextInChain = nullptr;
     deviceDesc.label = "My Device";
     deviceDesc.requiredFeatureCount = 0;
-    deviceDesc.requiredLimits = nullptr;
+	WGPURequiredLimits requiredLimits = GetRequiredLimits(m_Adapter);
+	deviceDesc.requiredLimits = &requiredLimits;
     deviceDesc.defaultQueue.nextInChain = nullptr;
     deviceDesc.defaultQueue.label = "the default queue";{}
 
@@ -157,9 +158,14 @@ void PSB::GraphicsContext::SwapBuffers()
     m_VertexBuffer.Bind(renderPass, 0);
     m_IndexBuffer.Bind(renderPass);
 
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 0, nullptr);
+    uint32_t dynamicOffset = 0;
 
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 1, &dynamicOffset);
     wgpuRenderPassEncoderDrawIndexed(renderPass, m_IndexCount, 1, 0, 0, 0);
+
+    dynamicOffset = 1 * m_UniformStride;
+	wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 1, &dynamicOffset);
+	wgpuRenderPassEncoderDrawIndexed(renderPass, m_IndexCount, 1, 0, 0, 0);
 
     wgpuRenderPassEncoderEnd(renderPass);
     wgpuRenderPassEncoderRelease(renderPass);
@@ -375,7 +381,7 @@ void PSB::GraphicsContext::InitializePipeline()
     // Default value as well (irrelevant for count = 1 anyways)
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-    WGPUBindGroupLayoutEntry bindingLayout;
+    WGPUBindGroupLayoutEntry bindingLayout{};
     setDefault(bindingLayout);
 
     bindingLayout.binding = 0;
@@ -389,7 +395,7 @@ void PSB::GraphicsContext::InitializePipeline()
     bindGroupLayoutDesc.nextInChain = nullptr;
     bindGroupLayoutDesc.entryCount = 1;
     bindGroupLayoutDesc.entries = &bindingLayout;
-    m_BindGroupLayout = wgpuDeviceCreateBindGroupLayout(m_Device, &bindGroupLayoutDesc);
+    m_BindGroupLayout = wgpuDeviceCreateBindGroupLayout(m_Device, &bindGroupLayoutDesc); // Crash here
 
     WGPUPipelineLayoutDescriptor layoutDesc{};
     layoutDesc.nextInChain = nullptr;
@@ -413,12 +419,6 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     supportedLimits.nextInChain = nullptr;
     wgpuAdapterGetLimits(adapter, &supportedLimits);
 
-    wgpuDeviceGetLimits(m_Device, &supportedLimits);
-    WGPULimits deviceLimits = supportedLimits.limits;
-
-    uint32_t uniformStride = ceilToNextMultiple((uint32_t)sizeof(MyUniforms),
-        (uint32_t)deviceLimits.minUniformBufferOffsetAlignment);
-
     WGPURequiredLimits requiredLimits{};
     setDefault(requiredLimits.limits);
 
@@ -427,7 +427,7 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     // We should also tell that we use 1 vertex buffers
     requiredLimits.limits.maxVertexBuffers = 1;
     // Maximum size of a buffer is 6 vertices of 2 float each
-    requiredLimits.limits.maxBufferSize = 6 * 5 * sizeof(float);
+    requiredLimits.limits.maxBufferSize = supportedLimits.limits.maxBufferSize;
     // Maximum stride between 2 consecutive vertices in the vertex buffer
     requiredLimits.limits.maxVertexBufferArrayStride = 5 * sizeof(float);
 
@@ -472,17 +472,32 @@ void PSB::GraphicsContext::InitializeBuffers()
 
     m_IndexBuffer = IndexBuffer(m_Device, m_Queue, indexData.data(), indexData.size() * sizeof(uint32_t));
 
+    WGPUSupportedLimits supportedLimits{};
+    supportedLimits.nextInChain = nullptr;
+	wgpuDeviceGetLimits(m_Device, &supportedLimits);
+	WGPULimits deviceLimits = supportedLimits.limits;
+
+	m_UniformStride = ceilToNextMultiple((uint32_t)sizeof(MyUniforms),
+		(uint32_t)deviceLimits.minUniformBufferOffsetAlignment);
+
+    LOG_DEBUG("minUniformBufferOffsetAlignment = {}", deviceLimits.minUniformBufferOffsetAlignment);
+
 	WGPUBufferDescriptor bufferDesc{};
 	bufferDesc.nextInChain = nullptr;
-	bufferDesc.size = sizeof(MyUniforms);
+	bufferDesc.size = m_UniformStride + sizeof(MyUniforms);
 	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform; // Vertex usage here!
 	bufferDesc.mappedAtCreation = false;
+    bufferDesc.label = "Uniform Buffer";
     m_UniformBuffer = wgpuDeviceCreateBuffer(m_Device, &bufferDesc);
 
     MyUniforms uniforms;
     uniforms.time = 1.0f;
     uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
 	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, 0, &uniforms, sizeof(MyUniforms));
+
+	uniforms.time = -1.0f;
+	uniforms.color = { 0.0f, 1.0f, 1.0f, 0.7f };
+	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, m_UniformStride, &uniforms, sizeof(MyUniforms));
 }
 
 void PSB::GraphicsContext::InitializeBindGroups()

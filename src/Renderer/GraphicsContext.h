@@ -68,5 +68,6 @@ namespace PSB
 		WGPUPipelineLayout m_Layout;
 		WGPUBindGroupLayout m_BindGroupLayout;
 		WGPUBindGroup m_BindGroup;
+		uint32_t m_UniformStride;
 	};
 }
