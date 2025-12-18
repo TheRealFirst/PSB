@@ -9,9 +9,14 @@
 #include <webgpu/webgpu.h>
 #include <webgpu/wgpu.h>
 
+#include <glm/matrix.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "AssetManagement\AssetManager.h"
 #include "RendererUtils.h"
 
+
+constexpr float PI = 3.14159265358979323846f;
 
 PSB::GraphicsContext::GraphicsContext()
 {
@@ -147,9 +152,15 @@ void PSB::GraphicsContext::Delete()
 
 void PSB::GraphicsContext::SwapBuffers()
 {
-	float time = static_cast<float>(glfwGetTime());
-	// Only update the 1-st float of the buffer
-	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, offsetof(MyUniforms, time), &time, sizeof(float));
+	float angle1 = (float)glfwGetTime();
+	float c1 = cos(angle1);
+	float s1 = sin(angle1);
+	glm::mat4x4 M(1.0f);
+	M = glm::rotate(M, angle1, glm::vec3(0.0f, 0.0f, 1.0f));
+	M = glm::translate(M, glm::vec3(0.5f, 0.0f, 0.0f));
+	M = glm::scale(M, glm::vec3(0.3f));
+	m_Uniforms.modelMatrix = M;
+    wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, offsetof(MyUniforms, modelMatrix), &m_Uniforms.modelMatrix, sizeof(glm::mat4));
 
     auto [surfaceTexture, targetView] = GetNextSurfaceViewData();
     if (!targetView) return;
@@ -174,6 +185,7 @@ void PSB::GraphicsContext::SwapBuffers()
     
     m_VertexBuffer.Bind(renderPass, 0);
     m_IndexBuffer.Bind(renderPass);
+   
 
     uint32_t dynamicOffset = 0;
 
@@ -316,21 +328,25 @@ void PSB::GraphicsContext::InitializePipeline()
 
     WGPUVertexBufferLayout vertexBufferLayout{};
     
-    std::vector<WGPUVertexAttribute> vertexAttribs(2);
+    std::vector<WGPUVertexAttribute> vertexAttribs(3);
 
     vertexAttribs[0].shaderLocation = 0;
     vertexAttribs[0].format = WGPUVertexFormat_Float32x3;
-    vertexAttribs[0].offset = 0;
+    vertexAttribs[0].offset = offsetof(VertexAttributes, position);
 
     vertexAttribs[1].shaderLocation = 1;
     vertexAttribs[1].format = WGPUVertexFormat_Float32x3;
-    vertexAttribs[1].offset = 3 * sizeof(float);
+    vertexAttribs[1].offset = offsetof(VertexAttributes, normal);
+
+	vertexAttribs[2].shaderLocation = 2;
+	vertexAttribs[2].format = WGPUVertexFormat_Float32x3;
+	vertexAttribs[2].offset = offsetof(VertexAttributes, color);
 
 
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
     vertexBufferLayout.attributes = vertexAttribs.data();
 
-    vertexBufferLayout.arrayStride = 6 * sizeof(float);
+    vertexBufferLayout.arrayStride = sizeof(VertexAttributes);
     vertexBufferLayout.stepMode = WGPUVertexStepMode_Vertex;
 
     // We do not use any vertex buffer for this first simplistic example
@@ -475,19 +491,19 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     setDefault(requiredLimits.limits);
 
     // We use at most 1 vertex attribute for now
-    requiredLimits.limits.maxVertexAttributes = 2;
+    requiredLimits.limits.maxVertexAttributes = 3;
     // We should also tell that we use 1 vertex buffers
     requiredLimits.limits.maxVertexBuffers = 1;
     // Maximum size of a buffer is 6 vertices of 2 float each
     requiredLimits.limits.maxBufferSize = supportedLimits.limits.maxBufferSize;
     // Maximum stride between 2 consecutive vertices in the vertex buffer
-    requiredLimits.limits.maxVertexBufferArrayStride = 6 * sizeof(float);
+    requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttributes);
 
-    requiredLimits.limits.maxInterStageShaderComponents = 3;
+    requiredLimits.limits.maxInterStageShaderComponents = 6;
 
     requiredLimits.limits.maxBindGroups = 1;
     requiredLimits.limits.maxUniformBuffersPerShaderStage = 1;
-    requiredLimits.limits.maxUniformBufferBindingSize = 16 * 4;
+    requiredLimits.limits.maxUniformBufferBindingSize = 16 * 4 * sizeof(float);
     requiredLimits.limits.maxDynamicUniformBuffersPerPipelineLayout = 1;
 
     requiredLimits.limits.maxTextureDimension1D = m_Height;
@@ -507,27 +523,24 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
 
 void PSB::GraphicsContext::InitializeBuffers()
 {
-    std::vector<float> pointData;
+    std::vector<float> vertexData;
 
     std::vector<uint32_t> indexData;
 
     
 
     // bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/webgpu.txt", pointData, indexData, 2);
-    bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/pyramid.txt", pointData, indexData, 3);
+    bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/pyramid.txt", vertexData, indexData, 6);
 
     if (!success) {
         LOG_ERROR("Could not load geometry!");
         exit(1);
     }
-
-    m_VertexCount = static_cast<uint32_t>(pointData.size() / 5);
-
-    m_IndexCount = static_cast<uint32_t>(indexData.size());
    
-    m_VertexBuffer = VertexBuffer(m_Device, m_Queue, pointData.data(), pointData.size() * sizeof(float));
+    m_VertexBuffer = VertexBuffer(m_Device, m_Queue, vertexData.data(), vertexData.size() * sizeof(float));
 
     m_IndexBuffer = IndexBuffer(m_Device, m_Queue, indexData.data(), indexData.size() * sizeof(uint32_t));
+    m_IndexCount = static_cast<uint32_t>(indexData.size());
 
     WGPUSupportedLimits supportedLimits{};
     supportedLimits.nextInChain = nullptr;
@@ -545,14 +558,39 @@ void PSB::GraphicsContext::InitializeBuffers()
     bufferDesc.label = "Uniform Buffer";
     m_UniformBuffer = wgpuDeviceCreateBuffer(m_Device, &bufferDesc);
 
-    MyUniforms uniforms;
-    uniforms.time = 1.0f;
-    uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
-	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, 0, &uniforms, sizeof(MyUniforms));
+    m_Uniforms.time = 1.0f;
+    m_Uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
+	
+    float angle1 = (float)glfwGetTime();
+	float c1 = cos(angle1);
+	float s1 = sin(angle1);
+	glm::mat4x4 M(1.0);
+	M = glm::rotate(M, angle1, glm::vec3(0.0f, 0.0f, 1.0f));
+	M = glm::translate(M, glm::vec3(0.5f, 0.0f, 0.0f));
+	M = glm::scale(M, glm::vec3(0.3f));
+	m_Uniforms.modelMatrix = M;
 
-	uniforms.time = -1.0f;
-	uniforms.color = { 0.0f, 1.0f, 1.0f, 0.7f };
-	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, m_UniformStride, &uniforms, sizeof(MyUniforms));
+	glm::vec3 focalPoint(0.0f, 0.0f, -2.0f);
+	float angle2 = 3.0f * PI / 4.0f;
+	float c2 = cosf(angle2);
+	float s2 = sinf(angle2);
+
+	glm::mat4 R2 = glm::rotate(glm::mat4x4(1.0f), -angle2, glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::mat4 T2 = glm::translate(glm::mat4x4(1.0f), -focalPoint);
+	m_Uniforms.viewMatrix = T2 * R2;
+
+	float ratio = float(m_Width) / float(m_Height);
+	float focalLength = 2.0;
+	float nearPlane = 0.01f;
+	float farPlane = 100.0f;
+	float fov = 2 * glm::atan(1 / focalLength);
+	m_Uniforms.projectionMatrix = glm::perspective(fov, ratio, nearPlane, farPlane);
+
+	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, 0, &m_Uniforms, sizeof(MyUniforms));
+
+	m_Uniforms.time = 1.0f;
+	m_Uniforms.color = { 0.0f, 1.0f, 0.4f, 0.7f };
+	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, m_UniformStride, &m_Uniforms, sizeof(MyUniforms));
 }
 
 void PSB::GraphicsContext::InitializeBindGroups()
