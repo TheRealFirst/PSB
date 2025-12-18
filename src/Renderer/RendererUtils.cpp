@@ -54,6 +54,26 @@ void setDefault(WGPUBindGroupLayoutEntry& bindingLayout) {
 	bindingLayout.texture.viewDimension = WGPUTextureViewDimension_Undefined;
 }
 
+void setDefault(WGPUStencilFaceState& stencilFaceState) {
+	stencilFaceState.compare = WGPUCompareFunction_Always;
+	stencilFaceState.failOp = WGPUStencilOperation_Keep;
+	stencilFaceState.depthFailOp = WGPUStencilOperation_Keep;
+	stencilFaceState.passOp = WGPUStencilOperation_Keep;
+}
+
+void setDefault(WGPUDepthStencilState& depthStencilState) {
+	depthStencilState.format = WGPUTextureFormat_Undefined;
+	depthStencilState.depthWriteEnabled = false;
+	depthStencilState.depthCompare = WGPUCompareFunction_Always;
+	depthStencilState.stencilReadMask = 0xFFFFFFFF;
+	depthStencilState.stencilWriteMask = 0xFFFFFFFF;
+	depthStencilState.depthBias = 0;
+	depthStencilState.depthBiasSlopeScale = 0;
+	depthStencilState.depthBiasClamp = 0;
+	setDefault(depthStencilState.stencilFront);
+	setDefault(depthStencilState.stencilBack);
+}
+
 uint32_t ceilToNextMultiple(uint32_t value, uint32_t step) {
 	uint32_t divide_and_ceil = value / step + (value % step == 0 ? 0 : 1);
 	return step * divide_and_ceil;

@@ -25,6 +25,8 @@ PSB::GraphicsContext::GraphicsContext(GLFWwindow* windowHandle) : m_WindowHandle
 
 void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
 {
+    m_Width = width;
+    m_Height = height;
     WGPUInstanceDescriptor desc{};
     m_Instance = wgpuCreateInstance(&desc);
     LOG_ASSERT(m_Instance);
@@ -106,12 +108,24 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
     m_RenderPassDesc = {};
     m_RenderPassDesc.colorAttachmentCount = 1;
     m_RenderPassDesc.colorAttachments = &m_ColorAttachment;
-    m_RenderPassDesc.depthStencilAttachment = nullptr;
     m_RenderPassDesc.timestampWrites = nullptr;
 
     InitializePipeline();
     InitializeBuffers();
     InitializeBindGroups();
+
+	
+	m_DepthStencilAttachment.depthClearValue = 1.0f;
+	m_DepthStencilAttachment.depthLoadOp = WGPULoadOp_Clear;
+	m_DepthStencilAttachment.depthStoreOp = WGPUStoreOp_Store;
+
+	m_DepthStencilAttachment.depthReadOnly = false;
+
+	m_DepthStencilAttachment.stencilClearValue = 0;
+	m_DepthStencilAttachment.stencilLoadOp = WGPULoadOp_Clear;
+	m_DepthStencilAttachment.stencilStoreOp = WGPUStoreOp_Store;
+	m_DepthStencilAttachment.stencilReadOnly = true;
+    m_RenderPassDesc.depthStencilAttachment = &m_DepthStencilAttachment;
 }
 
 void PSB::GraphicsContext::Delete()
@@ -126,6 +140,9 @@ void PSB::GraphicsContext::Delete()
 	wgpuPipelineLayoutRelease(m_Layout);
 	wgpuBindGroupLayoutRelease(m_BindGroupLayout);
     wgpuBindGroupRelease(m_BindGroup);
+    wgpuTextureViewRelease(m_DepthTextureView);
+    wgpuTextureDestroy(m_DepthTexture);
+    wgpuTextureRelease(m_DepthTexture);
 }
 
 void PSB::GraphicsContext::SwapBuffers()
@@ -143,12 +160,12 @@ void PSB::GraphicsContext::SwapBuffers()
     encoderDesc.label = "My command encoder";
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(m_Device, &encoderDesc);
 
-    // Create the render pass that clears the screen with our color
-    WGPURenderPassDescriptor renderPassDesc = {};
-    renderPassDesc.nextInChain = nullptr;
-
     
     m_ColorAttachment.view = targetView;
+    m_DepthStencilAttachment.view = m_DepthTextureView;
+
+    
+
     
     // Create the render pass and end it immediately (we only clear the screen but do not draw anything)
     WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &m_RenderPassDesc);
@@ -163,9 +180,9 @@ void PSB::GraphicsContext::SwapBuffers()
     wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 1, &dynamicOffset);
     wgpuRenderPassEncoderDrawIndexed(renderPass, m_IndexCount, 1, 0, 0, 0);
 
-    dynamicOffset = 1 * m_UniformStride;
-	wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 1, &dynamicOffset);
-	wgpuRenderPassEncoderDrawIndexed(renderPass, m_IndexCount, 1, 0, 0, 0);
+    // dynamicOffset = 1 * m_UniformStride;
+	// wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 1, &dynamicOffset);
+	// wgpuRenderPassEncoderDrawIndexed(renderPass, m_IndexCount, 1, 0, 0, 0);
 
     wgpuRenderPassEncoderEnd(renderPass);
     wgpuRenderPassEncoderRelease(renderPass);
@@ -191,6 +208,8 @@ void PSB::GraphicsContext::SwapBuffers()
     #elif defined(WEBGPU_BACKEND_WGPU)
     wgpuDevicePoll(m_Device, false, nullptr);
     #endif
+
+    wgpuTextureRelease(surfaceTexture.texture);
 }
 
 void PSB::GraphicsContext::SetClearColor(glm::vec4 clearColor)
@@ -253,6 +272,7 @@ WGPUDevice PSB::GraphicsContext::RequestDeviceSync(WGPUAdapter adapter, WGPUDevi
 
     LOG_ASSERT(userData.requestEnded);
 
+
     return userData.device;
 }
 
@@ -299,18 +319,18 @@ void PSB::GraphicsContext::InitializePipeline()
     std::vector<WGPUVertexAttribute> vertexAttribs(2);
 
     vertexAttribs[0].shaderLocation = 0;
-    vertexAttribs[0].format = WGPUVertexFormat_Float32x2;
+    vertexAttribs[0].format = WGPUVertexFormat_Float32x3;
     vertexAttribs[0].offset = 0;
 
     vertexAttribs[1].shaderLocation = 1;
     vertexAttribs[1].format = WGPUVertexFormat_Float32x3;
-    vertexAttribs[1].offset = 2 * sizeof(float);
+    vertexAttribs[1].offset = 3 * sizeof(float);
 
 
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
     vertexBufferLayout.attributes = vertexAttribs.data();
 
-    vertexBufferLayout.arrayStride = 5 * sizeof(float);
+    vertexBufferLayout.arrayStride = 6 * sizeof(float);
     vertexBufferLayout.stepMode = WGPUVertexStepMode_Vertex;
 
     // We do not use any vertex buffer for this first simplistic example
@@ -369,8 +389,40 @@ void PSB::GraphicsContext::InitializePipeline()
     fragmentState.targets = &colorTarget;
     pipelineDesc.fragment = &fragmentState;
 
-    // We do not use stencil/depth testing for now
-    pipelineDesc.depthStencil = nullptr;
+    
+    WGPUDepthStencilState depthStencilState;
+    setDefault(depthStencilState);
+
+    depthStencilState.depthCompare = WGPUCompareFunction_Less;
+    depthStencilState.depthWriteEnabled = true;
+
+	WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth24Plus;
+	depthStencilState.format = depthTextureFormat;
+	depthStencilState.stencilReadMask = 0;
+	depthStencilState.stencilWriteMask = 0;
+
+    pipelineDesc.depthStencil = &depthStencilState;
+
+    WGPUTextureDescriptor depthTextureDesc{};
+	depthTextureDesc.dimension = WGPUTextureDimension_2D;
+	depthTextureDesc.format = depthTextureFormat;
+	depthTextureDesc.mipLevelCount = 1;
+	depthTextureDesc.sampleCount = 1;
+	depthTextureDesc.size = { m_Width, m_Height, 1 };
+	depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
+	depthTextureDesc.viewFormatCount = 1;
+	depthTextureDesc.viewFormats = &depthTextureFormat;
+	m_DepthTexture = wgpuDeviceCreateTexture(m_Device, &depthTextureDesc);
+
+    WGPUTextureViewDescriptor depthTextureViewDesc{};
+	depthTextureViewDesc.aspect = WGPUTextureAspect_DepthOnly;
+	depthTextureViewDesc.baseArrayLayer = 0;
+	depthTextureViewDesc.arrayLayerCount = 1;
+	depthTextureViewDesc.baseMipLevel = 0;
+	depthTextureViewDesc.mipLevelCount = 1;
+	depthTextureViewDesc.dimension = WGPUTextureViewDimension_2D;
+	depthTextureViewDesc.format = depthTextureFormat;
+	m_DepthTextureView = wgpuTextureCreateView(m_DepthTexture, &depthTextureViewDesc);
 
     // Samples per pixel
     pipelineDesc.multisample.count = 1;
@@ -429,7 +481,7 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     // Maximum size of a buffer is 6 vertices of 2 float each
     requiredLimits.limits.maxBufferSize = supportedLimits.limits.maxBufferSize;
     // Maximum stride between 2 consecutive vertices in the vertex buffer
-    requiredLimits.limits.maxVertexBufferArrayStride = 5 * sizeof(float);
+    requiredLimits.limits.maxVertexBufferArrayStride = 6 * sizeof(float);
 
     requiredLimits.limits.maxInterStageShaderComponents = 3;
 
@@ -437,6 +489,10 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     requiredLimits.limits.maxUniformBuffersPerShaderStage = 1;
     requiredLimits.limits.maxUniformBufferBindingSize = 16 * 4;
     requiredLimits.limits.maxDynamicUniformBuffersPerPipelineLayout = 1;
+
+    requiredLimits.limits.maxTextureDimension1D = m_Height;
+    requiredLimits.limits.maxTextureDimension2D = m_Width;
+    requiredLimits.limits.maxTextureArrayLayers = 1;
 
     // These two limits are different because they are "minimum" limits,
     // they are the only ones we are may forward from the adapter's supported
@@ -457,7 +513,8 @@ void PSB::GraphicsContext::InitializeBuffers()
 
     
 
-    bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/webgpu.txt", pointData, indexData);
+    // bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/webgpu.txt", pointData, indexData, 2);
+    bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/pyramid.txt", pointData, indexData, 3);
 
     if (!success) {
         LOG_ERROR("Could not load geometry!");
@@ -479,8 +536,6 @@ void PSB::GraphicsContext::InitializeBuffers()
 
 	m_UniformStride = ceilToNextMultiple((uint32_t)sizeof(MyUniforms),
 		(uint32_t)deviceLimits.minUniformBufferOffsetAlignment);
-
-    LOG_DEBUG("minUniformBufferOffsetAlignment = {}", deviceLimits.minUniformBufferOffsetAlignment);
 
 	WGPUBufferDescriptor bufferDesc{};
 	bufferDesc.nextInChain = nullptr;

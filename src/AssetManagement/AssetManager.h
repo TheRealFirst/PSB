@@ -8,7 +8,7 @@ namespace PSB
 	class AssetManager
 	{
 	public:
-		static bool LoadGeometry(const std::filesystem::path& path, std::vector<float>& pointData, std::vector<uint32_t>& indexData);
+		static bool LoadGeometry(const std::filesystem::path& path, std::vector<float>& pointData, std::vector<uint32_t>& indexData, int dimensions);
 		static WGPUShaderModule LoadShaderModule(const std::filesystem::path& path, WGPUDevice device);
 	private:
 

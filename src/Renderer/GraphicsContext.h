@@ -42,6 +42,9 @@ namespace PSB
 		WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter) const;
 		void InitializeBindGroups();
 	private:
+		uint32_t m_Width;
+		uint32_t m_Height;
+
 		// Internal variables
 		WGPUInstance m_Instance = nullptr;
 		WGPUAdapter m_Adapter = nullptr;
@@ -69,5 +72,9 @@ namespace PSB
 		WGPUBindGroupLayout m_BindGroupLayout;
 		WGPUBindGroup m_BindGroup;
 		uint32_t m_UniformStride;
+
+		WGPUTexture m_DepthTexture = nullptr;
+		WGPUTextureView m_DepthTextureView = nullptr;
+		WGPURenderPassDepthStencilAttachment m_DepthStencilAttachment = nullptr;
 	};
 }
