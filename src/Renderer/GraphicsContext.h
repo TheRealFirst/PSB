@@ -36,11 +36,6 @@ namespace PSB
 			float _pad[3];
 		};
 
-		struct VertexAttributes {
-			glm::vec3 position;
-			glm::vec3 normal;
-			glm::vec3 color;
-		};
 
 		static_assert(sizeof(MyUniforms) % 16 == 0);
 	private:

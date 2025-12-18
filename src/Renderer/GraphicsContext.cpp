@@ -184,13 +184,14 @@ void PSB::GraphicsContext::SwapBuffers()
     wgpuRenderPassEncoderSetPipeline(renderPass, m_Pipeline);
     
     m_VertexBuffer.Bind(renderPass, 0);
-    m_IndexBuffer.Bind(renderPass);
+    // m_IndexBuffer.Bind(renderPass);
    
 
     uint32_t dynamicOffset = 0;
 
     wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 1, &dynamicOffset);
-    wgpuRenderPassEncoderDrawIndexed(renderPass, m_IndexCount, 1, 0, 0, 0);
+    // wgpuRenderPassEncoderDrawIndexed(renderPass, m_IndexCount, 1, 0, 0, 0);
+    wgpuRenderPassEncoderDraw(renderPass, m_IndexCount, 1, 0, 0);
 
     // dynamicOffset = 1 * m_UniformStride;
 	// wgpuRenderPassEncoderSetBindGroup(renderPass, 0, m_BindGroup, 1, &dynamicOffset);
@@ -523,24 +524,24 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
 
 void PSB::GraphicsContext::InitializeBuffers()
 {
-    std::vector<float> vertexData;
+    std::vector<VertexAttributes> vertexData;
 
-    std::vector<uint32_t> indexData;
+    // std::vector<uint32_t> indexData;
 
     
 
     // bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/webgpu.txt", pointData, indexData, 2);
-    bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/pyramid.txt", vertexData, indexData, 6);
+    bool success = AssetManager::LoadGeometryFromObj(RESOURCE_DIR "/pyramid.obj", vertexData);
 
     if (!success) {
         LOG_ERROR("Could not load geometry!");
         exit(1);
     }
    
-    m_VertexBuffer = VertexBuffer(m_Device, m_Queue, vertexData.data(), vertexData.size() * sizeof(float));
+    m_VertexBuffer = VertexBuffer(m_Device, m_Queue, vertexData.data(), vertexData.size() * sizeof(VertexAttributes));
 
-    m_IndexBuffer = IndexBuffer(m_Device, m_Queue, indexData.data(), indexData.size() * sizeof(uint32_t));
-    m_IndexCount = static_cast<uint32_t>(indexData.size());
+    // m_IndexBuffer = IndexBuffer(m_Device, m_Queue, indexData.data(), indexData.size() * sizeof(uint32_t));
+    m_IndexCount = static_cast<uint32_t>(vertexData.size());
 
     WGPUSupportedLimits supportedLimits{};
     supportedLimits.nextInChain = nullptr;
