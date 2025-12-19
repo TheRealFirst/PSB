@@ -115,11 +115,6 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
     m_RenderPassDesc.colorAttachments = &m_ColorAttachment;
     m_RenderPassDesc.timestampWrites = nullptr;
 
-    InitializePipeline();
-    InitializeBuffers();
-    InitializeBindGroups();
-
-	
 	m_DepthStencilAttachment.depthClearValue = 1.0f;
 	m_DepthStencilAttachment.depthLoadOp = WGPULoadOp_Clear;
 	m_DepthStencilAttachment.depthStoreOp = WGPUStoreOp_Store;
@@ -130,7 +125,60 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
 	m_DepthStencilAttachment.stencilLoadOp = WGPULoadOp_Clear;
 	m_DepthStencilAttachment.stencilStoreOp = WGPUStoreOp_Store;
 	m_DepthStencilAttachment.stencilReadOnly = true;
-    m_RenderPassDesc.depthStencilAttachment = &m_DepthStencilAttachment;
+	m_RenderPassDesc.depthStencilAttachment = &m_DepthStencilAttachment;
+
+	InitializePipeline();
+	InitializeBuffers();
+
+	WGPUTextureDescriptor textureDesc{};
+	textureDesc.nextInChain = nullptr;
+	textureDesc.dimension = WGPUTextureDimension_2D;
+	textureDesc.size = { 256, 256, 1 };
+	textureDesc.mipLevelCount = 1;
+	textureDesc.sampleCount = 1;
+	textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
+	textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+	textureDesc.viewFormatCount = 0;
+	textureDesc.viewFormats = nullptr;
+
+	m_Texture = wgpuDeviceCreateTexture(m_Device, &textureDesc); // crash here
+
+	std::vector<uint8_t> pixels(4 * textureDesc.size.width * textureDesc.size.height);
+	for (uint32_t i = 0; i < textureDesc.size.width; ++i) {
+		for (uint32_t j = 0; j < textureDesc.size.height; ++j) {
+			uint8_t* p = &pixels[4 * (j * textureDesc.size.width + i)];
+			p[0] = (uint8_t)i; // r
+			p[1] = (uint8_t)j; // g
+			p[2] = 128; // b
+			p[3] = 255; // a
+		}
+	}
+
+    WGPUImageCopyTexture destination{};
+	destination.texture = m_Texture;
+	destination.origin = { 0, 0, 0 };
+	destination.aspect = WGPUTextureAspect_All;
+
+    WGPUTextureDataLayout source{};
+	source.offset = 0;
+	source.bytesPerRow = 4 * textureDesc.size.width;
+	source.rowsPerImage = textureDesc.size.height;
+
+	wgpuQueueWriteTexture(m_Queue, &destination, pixels.data(), pixels.size(), &source, &textureDesc.size);
+
+    WGPUTextureViewDescriptor textureViewDesc{};
+	textureViewDesc.nextInChain = nullptr;
+	textureViewDesc.aspect = WGPUTextureAspect_All;
+	textureViewDesc.baseArrayLayer = 0;
+	textureViewDesc.arrayLayerCount = 1;
+	textureViewDesc.baseMipLevel = 0;
+	textureViewDesc.mipLevelCount = 1;
+	textureViewDesc.format = textureDesc.format;
+    textureViewDesc.dimension = WGPUTextureViewDimension_2D;
+	m_TextureView = wgpuTextureCreateView(m_Texture, &textureViewDesc);
+
+    
+    InitializeBindGroups();
 }
 
 void PSB::GraphicsContext::Delete()
@@ -139,6 +187,7 @@ void PSB::GraphicsContext::Delete()
     if (m_Device) { wgpuDeviceRelease(m_Device); m_Device = nullptr; }
     if (m_Adapter) { wgpuAdapterRelease(m_Adapter); m_Adapter = nullptr; }
     if (m_Instance) { wgpuInstanceRelease(m_Instance); m_Instance = nullptr; }
+    wgpuBufferRelease(m_VertexBuffer);
     wgpuSurfaceUnconfigure(m_Surface);
     wgpuSurfaceRelease(m_Surface);
     wgpuRenderPipelineRelease(m_Pipeline);
@@ -148,19 +197,13 @@ void PSB::GraphicsContext::Delete()
     wgpuTextureViewRelease(m_DepthTextureView);
     wgpuTextureDestroy(m_DepthTexture);
     wgpuTextureRelease(m_DepthTexture);
+    wgpuTextureDestroy(m_Texture);
+    wgpuTextureRelease(m_Texture);
 }
 
 void PSB::GraphicsContext::SwapBuffers()
 {
-	float angle1 = (float)glfwGetTime();
-	float c1 = cos(angle1);
-	float s1 = sin(angle1);
-	glm::mat4x4 M(1.0f);
-	M = glm::rotate(M, angle1, glm::vec3(0.0f, 0.0f, 1.0f));
-	M = glm::translate(M, glm::vec3(0.5f, 0.0f, 0.0f));
-	M = glm::scale(M, glm::vec3(0.3f));
-	m_Uniforms.modelMatrix = M;
-    wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, offsetof(MyUniforms, modelMatrix), &m_Uniforms.modelMatrix, sizeof(glm::mat4));
+    // wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, offsetof(MyUniforms, modelMatrix), &m_Uniforms.modelMatrix, sizeof(glm::mat4));
 
     auto [surfaceTexture, targetView] = GetNextSurfaceViewData();
     if (!targetView) return;
@@ -183,7 +226,7 @@ void PSB::GraphicsContext::SwapBuffers()
 
     wgpuRenderPassEncoderSetPipeline(renderPass, m_Pipeline);
     
-    m_VertexBuffer.Bind(renderPass, 0);
+    wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, m_VertexBuffer, 0, wgpuBufferGetSize(m_VertexBuffer));
     // m_IndexBuffer.Bind(renderPass);
    
 
@@ -450,7 +493,10 @@ void PSB::GraphicsContext::InitializePipeline()
     // Default value as well (irrelevant for count = 1 anyways)
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-    WGPUBindGroupLayoutEntry bindingLayout{};
+
+    std::vector<WGPUBindGroupLayoutEntry> bindingLayoutEntries(2);
+
+    WGPUBindGroupLayoutEntry& bindingLayout = bindingLayoutEntries[0];
     setDefault(bindingLayout);
 
     bindingLayout.binding = 0;
@@ -460,11 +506,18 @@ void PSB::GraphicsContext::InitializePipeline()
     bindingLayout.buffer.minBindingSize = sizeof(MyUniforms);
     bindingLayout.buffer.hasDynamicOffset = true;
 
+    WGPUBindGroupLayoutEntry& textureBindingLayout = bindingLayoutEntries[1];
+    setDefault(textureBindingLayout);
+    textureBindingLayout.binding = 1;
+    textureBindingLayout.visibility = WGPUShaderStage_Fragment;
+    textureBindingLayout.texture.sampleType = WGPUTextureSampleType_Float;
+    textureBindingLayout.texture.viewDimension = WGPUTextureViewDimension_2D;
+
     WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc{};
     bindGroupLayoutDesc.nextInChain = nullptr;
-    bindGroupLayoutDesc.entryCount = 1;
-    bindGroupLayoutDesc.entries = &bindingLayout;
-    m_BindGroupLayout = wgpuDeviceCreateBindGroupLayout(m_Device, &bindGroupLayoutDesc); // Crash here
+    bindGroupLayoutDesc.entryCount = (uint32_t)bindingLayoutEntries.size();
+    bindGroupLayoutDesc.entries = bindingLayoutEntries.data();
+    m_BindGroupLayout = wgpuDeviceCreateBindGroupLayout(m_Device, &bindGroupLayoutDesc);
 
     WGPUPipelineLayoutDescriptor layoutDesc{};
     layoutDesc.nextInChain = nullptr;
@@ -511,6 +564,8 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     requiredLimits.limits.maxTextureDimension2D = m_Width;
     requiredLimits.limits.maxTextureArrayLayers = 1;
 
+    requiredLimits.limits.maxSampledTexturesPerShaderStage = 1;
+
     // These two limits are different because they are "minimum" limits,
     // they are the only ones we are may forward from the adapter's supported
     // limits.
@@ -531,14 +586,22 @@ void PSB::GraphicsContext::InitializeBuffers()
     
 
     // bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/webgpu.txt", pointData, indexData, 2);
-    bool success = AssetManager::LoadGeometryFromObj(RESOURCE_DIR "/pyramid.obj", vertexData);
+    bool success = AssetManager::LoadGeometryFromObj(RESOURCE_DIR "/plane.obj", vertexData);
 
     if (!success) {
         LOG_ERROR("Could not load geometry!");
         exit(1);
     }
-   
-    m_VertexBuffer = VertexBuffer(m_Device, m_Queue, vertexData.data(), vertexData.size() * sizeof(VertexAttributes));
+ 
+
+	WGPUBufferDescriptor bufferDesc{};
+	bufferDesc.nextInChain = nullptr;
+	bufferDesc.size = vertexData.size() * sizeof(VertexAttributes);
+	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
+	bufferDesc.mappedAtCreation = false;
+	m_VertexBuffer = wgpuDeviceCreateBuffer(m_Device, &bufferDesc);
+
+	wgpuQueueWriteBuffer(m_Queue, m_VertexBuffer, 0, vertexData.data(), bufferDesc.size);
 
     // m_IndexBuffer = IndexBuffer(m_Device, m_Queue, indexData.data(), indexData.size() * sizeof(uint32_t));
     m_IndexCount = static_cast<uint32_t>(vertexData.size());
@@ -551,7 +614,7 @@ void PSB::GraphicsContext::InitializeBuffers()
 	m_UniformStride = ceilToNextMultiple((uint32_t)sizeof(MyUniforms),
 		(uint32_t)deviceLimits.minUniformBufferOffsetAlignment);
 
-	WGPUBufferDescriptor bufferDesc{};
+	
 	bufferDesc.nextInChain = nullptr;
 	bufferDesc.size = m_UniformStride + sizeof(MyUniforms);
 	bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform; // Vertex usage here!
@@ -562,30 +625,10 @@ void PSB::GraphicsContext::InitializeBuffers()
     m_Uniforms.time = 1.0f;
     m_Uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
 	
-    float angle1 = (float)glfwGetTime();
-	float c1 = cos(angle1);
-	float s1 = sin(angle1);
-	glm::mat4x4 M(1.0);
-	M = glm::rotate(M, angle1, glm::vec3(0.0f, 0.0f, 1.0f));
-	M = glm::translate(M, glm::vec3(0.5f, 0.0f, 0.0f));
-	M = glm::scale(M, glm::vec3(0.3f));
-	m_Uniforms.modelMatrix = M;
-
-	glm::vec3 focalPoint(0.0f, 0.0f, -2.0f);
-	float angle2 = 3.0f * PI / 4.0f;
-	float c2 = cosf(angle2);
-	float s2 = sinf(angle2);
-
-	glm::mat4 R2 = glm::rotate(glm::mat4x4(1.0f), -angle2, glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::mat4 T2 = glm::translate(glm::mat4x4(1.0f), -focalPoint);
-	m_Uniforms.viewMatrix = T2 * R2;
-
-	float ratio = float(m_Width) / float(m_Height);
-	float focalLength = 2.0;
-	float nearPlane = 0.01f;
-	float farPlane = 100.0f;
-	float fov = 2 * glm::atan(1 / focalLength);
-	m_Uniforms.projectionMatrix = glm::perspective(fov, ratio, nearPlane, farPlane);
+    
+	m_Uniforms.modelMatrix = glm::mat4(1.0f);
+	m_Uniforms.viewMatrix =glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
+	m_Uniforms.projectionMatrix = glm::ortho(-1, 1, -1, 1, -1, 1);
 
 	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, 0, &m_Uniforms, sizeof(MyUniforms));
 
@@ -596,21 +639,23 @@ void PSB::GraphicsContext::InitializeBuffers()
 
 void PSB::GraphicsContext::InitializeBindGroups()
 {
-	WGPUBindGroupEntry binding{};
-	binding.nextInChain = nullptr;
+    std::vector<WGPUBindGroupEntry> bindings(2);
+	
+    bindings[0].nextInChain = nullptr;
+	bindings[0].binding = 0;
+	bindings[0].buffer = m_UniformBuffer;
+	bindings[0].offset = 0;
+	bindings[0].size = sizeof(MyUniforms);
 
-	binding.binding = 0;
-	binding.buffer = m_UniformBuffer;
-
-	binding.offset = 0;
-	binding.size = sizeof(MyUniforms);
+    bindings[1].binding = 1;
+    bindings[1].textureView = m_TextureView;
 
 
 	WGPUBindGroupDescriptor bindGroupDesc{};
 	bindGroupDesc.nextInChain = nullptr;
 	bindGroupDesc.layout = m_BindGroupLayout;
 
-	bindGroupDesc.entryCount = 1;
-	bindGroupDesc.entries = &binding;
+	bindGroupDesc.entryCount = (uint32_t)bindings.size();
+	bindGroupDesc.entries = bindings.data();
 	m_BindGroup = wgpuDeviceCreateBindGroup(m_Device, &bindGroupDesc);
 }

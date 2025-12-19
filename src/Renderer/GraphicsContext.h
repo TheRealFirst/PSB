@@ -1,7 +1,5 @@
 #pragma once
 #include "Core/Core.h"
-#include "Buffers/VertexBuffer.h"
-#include "Buffers/IndexBuffer.h"
 
 #include <webgpu/webgpu.h>
 
@@ -67,10 +65,9 @@ namespace PSB
 
 		glm::vec4 m_ClearColor{0.01f, 0.01f, 0.01f, 1.0f};
 
-		VertexBuffer m_VertexBuffer;
+		WGPUBuffer m_VertexBuffer = nullptr;
 	
 
-		IndexBuffer m_IndexBuffer;
 		uint32_t m_IndexCount;
 
 		WGPUBuffer m_UniformBuffer;
@@ -84,5 +81,8 @@ namespace PSB
 		WGPURenderPassDepthStencilAttachment m_DepthStencilAttachment = nullptr;
 
 		MyUniforms m_Uniforms;
+
+		WGPUTexture m_Texture = nullptr;
+		WGPUTextureView m_TextureView = nullptr;
 	};
 }
