@@ -2,12 +2,14 @@ struct VertexInput {
 	@location(0) position: vec3f,
 	@location(1) normal: vec3f,
 	@location(2) color: vec3f,
+	@location(3) uv: vec2f,
 };
 
 struct VertexOutput{
     @builtin(position) position: vec4f,
     @location(0) color: vec3f,
 	@location(1) normal : vec3f,
+    @location(2) uv: vec2f,
 }
 
 struct MyUniforms {
@@ -23,6 +25,7 @@ const pi = 3.14159265359;
 
 @group(0) @binding(0) var<uniform> uMyUniforms: MyUniforms;
 @group(0) @binding(1) var gradientTexture: texture_2d<f32>;
+@group(0) @binding(2) var textureSampler: sampler;
 
 
 @vertex
@@ -31,6 +34,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 	out.position = uMyUniforms.projectionMatrix * uMyUniforms.viewMatrix * uMyUniforms.modelMatrix * vec4f(in.position, 1.0);
 	out.color = in.color;
 	out.normal = (uMyUniforms.modelMatrix * vec4f(in.normal, 0.0)).xyz;
+    out.uv = in.uv;
 	return out;
 }
 
@@ -46,7 +50,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     // let shading = shading1 * lightColor1 + shading2 * lightColor2;
     // let color = in.color * shading;
 
-    let color = textureLoad(gradientTexture, vec2i(in.position.xy), 0).rgb;
+    let color = textureSample(gradientTexture, textureSampler, in.uv).rgb;
 
 	// Gamma-correction
 	let corrected_color = pow(color, vec3f(2.2));

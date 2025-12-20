@@ -134,7 +134,7 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
 	textureDesc.nextInChain = nullptr;
 	textureDesc.dimension = WGPUTextureDimension_2D;
 	textureDesc.size = { 256, 256, 1 };
-	textureDesc.mipLevelCount = 1;
+	textureDesc.mipLevelCount = 8;
 	textureDesc.sampleCount = 1;
 	textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
 	textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
@@ -143,16 +143,6 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
 
 	m_Texture = wgpuDeviceCreateTexture(m_Device, &textureDesc); // crash here
 
-	std::vector<uint8_t> pixels(4 * textureDesc.size.width * textureDesc.size.height);
-	for (uint32_t i = 0; i < textureDesc.size.width; ++i) {
-		for (uint32_t j = 0; j < textureDesc.size.height; ++j) {
-			uint8_t* p = &pixels[4 * (j * textureDesc.size.width + i)];
-			p[0] = (uint8_t)i; // r
-			p[1] = (uint8_t)j; // g
-			p[2] = 128; // b
-			p[3] = 255; // a
-		}
-	}
 
     WGPUImageCopyTexture destination{};
 	destination.texture = m_Texture;
@@ -161,10 +151,50 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
 
     WGPUTextureDataLayout source{};
 	source.offset = 0;
-	source.bytesPerRow = 4 * textureDesc.size.width;
-	source.rowsPerImage = textureDesc.size.height;
 
-	wgpuQueueWriteTexture(m_Queue, &destination, pixels.data(), pixels.size(), &source, &textureDesc.size);
+    WGPUExtent3D mipLevelSize = textureDesc.size;
+    std::vector<uint8_t> previousLevelPixels;
+    for (uint32_t level = 0; level < textureDesc.mipLevelCount; ++level)
+    {
+		
+        
+        std::vector<uint8_t> pixels(4 * mipLevelSize.width * mipLevelSize.height);
+        for (uint32_t i = 0; i < mipLevelSize.width; ++i) {
+            for (uint32_t j = 0; j < mipLevelSize.height; ++j) {
+                uint8_t* p = &pixels[4 * (j * mipLevelSize.width + i)];
+                if (level == 0) {
+                    p[0] = (i / 16) % 2 == (j / 16) % 2 ? 255 : 0; // r
+                    p[1] = ((i - j) / 16) % 2 == 0 ? 255 : 0; // g
+                    p[2] = ((i + j) / 16) % 2 == 0 ? 255 : 0; // b
+                }
+                else {
+                    // Get the corresponding 4 pixels from the previous level
+                    uint8_t* p00 = &previousLevelPixels[4 * ((2 * j + 0) * (2 * mipLevelSize.width) + (2 * i + 0))];
+                    uint8_t* p01 = &previousLevelPixels[4 * ((2 * j + 0) * (2 * mipLevelSize.width) + (2 * i + 1))];
+                    uint8_t* p10 = &previousLevelPixels[4 * ((2 * j + 1) * (2 * mipLevelSize.width) + (2 * i + 0))];
+                    uint8_t* p11 = &previousLevelPixels[4 * ((2 * j + 1) * (2 * mipLevelSize.width) + (2 * i + 1))];
+                    // Average
+                    p[0] = (p00[0] + p01[0] + p10[0] + p11[0]) / 4;
+                    p[1] = (p00[1] + p01[1] + p10[1] + p11[1]) / 4;
+                    p[2] = (p00[2] + p01[2] + p10[2] + p11[2]) / 4;
+                }
+                p[3] = 255; // a
+            }
+        }
+        
+
+        destination.mipLevel = level;
+
+		source.bytesPerRow = 4 * mipLevelSize.width;
+		source.rowsPerImage = mipLevelSize.height;
+
+		wgpuQueueWriteTexture(m_Queue, &destination, pixels.data(), pixels.size(), &source, &mipLevelSize);
+
+        mipLevelSize.width /= 2;
+        mipLevelSize.height /= 2;
+        previousLevelPixels = std::move(pixels);
+    }
+	
 
     WGPUTextureViewDescriptor textureViewDesc{};
 	textureViewDesc.nextInChain = nullptr;
@@ -172,10 +202,23 @@ void PSB::GraphicsContext::Init(uint32_t width, uint32_t height)
 	textureViewDesc.baseArrayLayer = 0;
 	textureViewDesc.arrayLayerCount = 1;
 	textureViewDesc.baseMipLevel = 0;
-	textureViewDesc.mipLevelCount = 1;
+	textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
 	textureViewDesc.format = textureDesc.format;
     textureViewDesc.dimension = WGPUTextureViewDimension_2D;
 	m_TextureView = wgpuTextureCreateView(m_Texture, &textureViewDesc);
+
+    WGPUSamplerDescriptor samplerDesc{};
+    samplerDesc.addressModeU = WGPUAddressMode_ClampToEdge;
+    samplerDesc.addressModeV = WGPUAddressMode_ClampToEdge;
+    samplerDesc.addressModeW = WGPUAddressMode_ClampToEdge;
+    samplerDesc.magFilter = WGPUFilterMode_Linear;
+    samplerDesc.minFilter = WGPUFilterMode_Linear;
+    samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Nearest;
+    samplerDesc.lodMinClamp = 0.0f;
+    samplerDesc.lodMaxClamp = 8.0f;
+    samplerDesc.compare = WGPUCompareFunction_Undefined;
+    samplerDesc.maxAnisotropy = 1;
+    m_Sampler = wgpuDeviceCreateSampler(m_Device, &samplerDesc);
 
     
     InitializeBindGroups();
@@ -372,7 +415,7 @@ void PSB::GraphicsContext::InitializePipeline()
 
     WGPUVertexBufferLayout vertexBufferLayout{};
     
-    std::vector<WGPUVertexAttribute> vertexAttribs(3);
+    std::vector<WGPUVertexAttribute> vertexAttribs(4);
 
     vertexAttribs[0].shaderLocation = 0;
     vertexAttribs[0].format = WGPUVertexFormat_Float32x3;
@@ -385,6 +428,10 @@ void PSB::GraphicsContext::InitializePipeline()
 	vertexAttribs[2].shaderLocation = 2;
 	vertexAttribs[2].format = WGPUVertexFormat_Float32x3;
 	vertexAttribs[2].offset = offsetof(VertexAttributes, color);
+
+    vertexAttribs[3].shaderLocation = 3;
+    vertexAttribs[3].format = WGPUVertexFormat_Float32x2;
+    vertexAttribs[3].offset = offsetof(VertexAttributes, uv);
 
 
     vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
@@ -494,7 +541,7 @@ void PSB::GraphicsContext::InitializePipeline()
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
 
-    std::vector<WGPUBindGroupLayoutEntry> bindingLayoutEntries(2);
+    std::vector<WGPUBindGroupLayoutEntry> bindingLayoutEntries(3);
 
     WGPUBindGroupLayoutEntry& bindingLayout = bindingLayoutEntries[0];
     setDefault(bindingLayout);
@@ -512,6 +559,12 @@ void PSB::GraphicsContext::InitializePipeline()
     textureBindingLayout.visibility = WGPUShaderStage_Fragment;
     textureBindingLayout.texture.sampleType = WGPUTextureSampleType_Float;
     textureBindingLayout.texture.viewDimension = WGPUTextureViewDimension_2D;
+
+    WGPUBindGroupLayoutEntry& samplerBindingLayout = bindingLayoutEntries[2];
+    setDefault(samplerBindingLayout);
+    samplerBindingLayout.binding = 2;
+    samplerBindingLayout.visibility = WGPUShaderStage_Fragment;
+    samplerBindingLayout.sampler.type = WGPUSamplerBindingType_Filtering;
 
     WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc{};
     bindGroupLayoutDesc.nextInChain = nullptr;
@@ -545,7 +598,7 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     setDefault(requiredLimits.limits);
 
     // We use at most 1 vertex attribute for now
-    requiredLimits.limits.maxVertexAttributes = 3;
+    requiredLimits.limits.maxVertexAttributes = 4;
     // We should also tell that we use 1 vertex buffers
     requiredLimits.limits.maxVertexBuffers = 1;
     // Maximum size of a buffer is 6 vertices of 2 float each
@@ -553,7 +606,7 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     // Maximum stride between 2 consecutive vertices in the vertex buffer
     requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttributes);
 
-    requiredLimits.limits.maxInterStageShaderComponents = 6;
+    requiredLimits.limits.maxInterStageShaderComponents = 8;
 
     requiredLimits.limits.maxBindGroups = 1;
     requiredLimits.limits.maxUniformBuffersPerShaderStage = 1;
@@ -565,6 +618,7 @@ WGPURequiredLimits PSB::GraphicsContext::GetRequiredLimits(WGPUAdapter adapter) 
     requiredLimits.limits.maxTextureArrayLayers = 1;
 
     requiredLimits.limits.maxSampledTexturesPerShaderStage = 1;
+    requiredLimits.limits.maxSamplersPerShaderStage = 1;
 
     // These two limits are different because they are "minimum" limits,
     // they are the only ones we are may forward from the adapter's supported
@@ -586,7 +640,7 @@ void PSB::GraphicsContext::InitializeBuffers()
     
 
     // bool success = AssetManager::LoadGeometry(RESOURCE_DIR "/webgpu.txt", pointData, indexData, 2);
-    bool success = AssetManager::LoadGeometryFromObj(RESOURCE_DIR "/plane.obj", vertexData);
+    bool success = AssetManager::LoadGeometryFromObj(RESOURCE_DIR "/cube.obj", vertexData);
 
     if (!success) {
         LOG_ERROR("Could not load geometry!");
@@ -626,9 +680,9 @@ void PSB::GraphicsContext::InitializeBuffers()
     m_Uniforms.color = { 0.0f, 1.0f, 0.4f, 1.0f };
 	
     
-	m_Uniforms.modelMatrix = glm::mat4(1.0f);
-	m_Uniforms.viewMatrix =glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
-	m_Uniforms.projectionMatrix = glm::ortho(-1, 1, -1, 1, -1, 1);
+	m_Uniforms.modelMatrix = glm::mat4x4(1.0f);
+	m_Uniforms.viewMatrix = glm::lookAt(glm::vec3(-2.0f, -3.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	m_Uniforms.projectionMatrix = glm::perspective(45 * PI / 180, m_Width / float(m_Height), 0.01f, 100.0f);
 
 	wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, 0, &m_Uniforms, sizeof(MyUniforms));
 
@@ -639,7 +693,7 @@ void PSB::GraphicsContext::InitializeBuffers()
 
 void PSB::GraphicsContext::InitializeBindGroups()
 {
-    std::vector<WGPUBindGroupEntry> bindings(2);
+    std::vector<WGPUBindGroupEntry> bindings(3);
 	
     bindings[0].nextInChain = nullptr;
 	bindings[0].binding = 0;
@@ -649,6 +703,9 @@ void PSB::GraphicsContext::InitializeBindGroups()
 
     bindings[1].binding = 1;
     bindings[1].textureView = m_TextureView;
+
+	bindings[2].binding = 2;
+	bindings[2].sampler = m_Sampler;
 
 
 	WGPUBindGroupDescriptor bindGroupDesc{};

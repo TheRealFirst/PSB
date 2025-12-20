@@ -4,6 +4,9 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -119,6 +122,11 @@ bool PSB::AssetManager::LoadGeometryFromObj(const std::filesystem::path& path, s
 				attrib.colors[3 * idx.vertex_index + 1],
 				attrib.colors[3 * idx.vertex_index + 2]
 			};
+
+			vertexData[offset + i].uv = {
+		        attrib.texcoords[2 * idx.texcoord_index + 0],
+		        1 - attrib.texcoords[2 * idx.texcoord_index + 1]
+			};
 		}
 	}
 
@@ -150,4 +158,59 @@ WGPUShaderModule PSB::AssetManager::LoadShaderModule(const std::filesystem::path
     #endif
     shaderDesc.nextInChain = &shaderCodeDesc.chain;
     return wgpuDeviceCreateShaderModule(device, &shaderDesc);
+}
+
+WGPUTexture PSB::AssetManager::LoadTexture(const std::filesystem::path& path, WGPUDevice device, WGPUTextureView* pTextureView = nullptr)
+{
+    int width, height, channels;
+    unsigned char* pixelData = stbi_load(path.string().c_str(), &width, &height, &channels, 0);
+    if (pixelData == nullptr) return nullptr;
+
+    WGPUTextureDescriptor textureDesc = {};
+    textureDesc.nextInChain = nullptr;
+    textureDesc.dimension = WGPUTextureDimension_2D;
+    textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
+    textureDesc.mipLevelCount = 1;
+    textureDesc.sampleCount = 1;
+    textureDesc.size = { (unsigned int)width, (unsigned int)height, 1 };
+    textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+    textureDesc.viewFormatCount = 0;
+    textureDesc.viewFormats = nullptr;
+    WGPUTexture texture = wgpuDeviceCreateTexture(device, &textureDesc);
+
+    writeMipMaps(device, texture, textureDesc.size, textureDesc.mipLevelCount, pixelData);
+
+    stbi_image_free(pixelData);
+
+    if (pTextureView) {
+        WGPUTextureViewDescriptor textureViewDesc;
+        textureViewDesc.aspect = WGPUTextureAspect_All;
+        textureViewDesc.baseArrayLayer = 0;
+        textureViewDesc.arrayLayerCount = 1;
+        textureViewDesc.baseMipLevel = 0;
+        textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
+        textureViewDesc.dimension = WGPUTextureViewDimension_2D;
+        textureViewDesc.format = textureDesc.format;
+        *pTextureView = wgpuTextureCreateView(texture, &textureViewDesc);
+    }
+
+
+    return texture;
+}
+
+static void writeMipMaps(WGPUDevice device, WGPUTexture texture, WGPUExtent3D textureSize, [[maybe_unused]] uint32_t mipLevelCount, const unsigned char* pixelData) {
+    WGPUImageCopyTexture destination{};
+    destination.texture = texture;
+    destination.mipLevel = 0;
+    destination.origin = { 0, 0, 0 };
+    destination.aspect = WGPUTextureAspect_All;
+
+    WGPUTextureDataLayout source{};
+    source.offset = 0;
+    source.bytesPerRow = 4 * textureSize.width;
+    source.rowsPerImage = textureSize.height;
+
+    WGPUQueue queue = wgpuDeviceGetQueue(device);
+    wgpuQueueWriteTexture(queue, &destination, pixelData, 4 * textureSize.width * textureSize.height, &source, textureSize);
+    wgpuQueueRelease(queue);
 }

@@ -11,6 +11,7 @@ namespace PSB
 		glm::vec3 position;
 		glm::vec3 normal;
 		glm::vec3 color;
+		glm::vec2 uv;
 	};
 
 	class AssetManager
@@ -19,6 +20,7 @@ namespace PSB
 		static bool LoadGeometry(const std::filesystem::path& path, std::vector<float>& pointData, std::vector<uint32_t>& indexData, int dimensions);
 		static bool LoadGeometryFromObj(const std::filesystem::path& path, std::vector<VertexAttributes>& vertexData);
 		static WGPUShaderModule LoadShaderModule(const std::filesystem::path& path, WGPUDevice device);
+		static WGPUTexture LoadTexture(const std::filesystem::path& path, WGPUDevice device, WGPUTextureView* pTextureView = nullptr);
 	private:
 
 	};

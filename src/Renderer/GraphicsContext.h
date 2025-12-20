@@ -84,5 +84,6 @@ namespace PSB
 
 		WGPUTexture m_Texture = nullptr;
 		WGPUTextureView m_TextureView = nullptr;
+		WGPUSampler m_Sampler = nullptr;
 	};
 }

@@ -21,13 +21,14 @@ file(GLOB_RECURSE PSB_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
 
-add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Layer.h" "src/Core/Layer.cpp" "src/Core/Timestep.h" "src/Core/Layerstack.h" "src/Core/Layerstack.cpp" "src/Core/EntryPoint.h" "src/Renderer/Renderer.h" "src/Renderer/Renderer.cpp" "src/Renderer/Renderer2D.h" "src/Renderer/Renderer2D.cpp"     "src/AssetManagement/AssetManager.h" "src/AssetManagement/AssetManager.cpp" "src/Renderer/RendererUtils.h" "src/Renderer/RendererUtils.cpp" "dependencies/TinyOBJLoader/tiny_obj_loader.h")
+add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Layer.h" "src/Core/Layer.cpp" "src/Core/Timestep.h" "src/Core/Layerstack.h" "src/Core/Layerstack.cpp" "src/Core/EntryPoint.h" "src/Renderer/Renderer.h" "src/Renderer/Renderer.cpp" "src/Renderer/Renderer2D.h" "src/Renderer/Renderer2D.cpp"     "src/AssetManagement/AssetManager.h" "src/AssetManagement/AssetManager.cpp" "src/Renderer/RendererUtils.h" "src/Renderer/RendererUtils.cpp" "dependencies/TinyOBJLoader/tiny_obj_loader.h" "dependencies/stb_image/stb_image.h")
 
 target_include_directories(PSB PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glm   # glm is header-only
   ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glfw3webgpu/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/TinyOBJLoader)
+  ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/TinyOBJLoader
+  ${CMAKE_CURRENT_SOURCE_DIR}/dependencies/stb_image)
 
 
 
@@ -94,3 +95,16 @@ function(PSB_copy_wgpu_runtime target)
               "$<TARGET_FILE_DIR:${target}>")
   endif()
 endfunction()
+
+
+if (MSVC)
+	# Ignore a warning that GLM requires to bypass
+	# Disable warning C4201: nonstandard extension used: nameless struct/union
+	target_compile_options(PSB PUBLIC /wd4201)
+	# Disable warning C4305: truncation from 'int' to 'bool' in 'if' condition
+	target_compile_options(PSB PUBLIC /wd4305)
+
+	# Ignore a warning that stb_image requires to bypass
+	# Disable warning C4244: conversion from 'int' to 'short', possible loss of data
+	target_compile_options(PSB PUBLIC /wd4244)
+endif (MSVC)
