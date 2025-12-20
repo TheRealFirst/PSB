@@ -23,6 +23,8 @@ namespace PSB
 
 
 		virtual void* GetNativeWindow() const { return m_Window; }
+
+		virtual Ref<GraphicsContext> GetGraphicsContext() const { return m_Context; }
 	private:
 		virtual void Init(const WindowProbs& probs);
 		virtual void Shutdown();

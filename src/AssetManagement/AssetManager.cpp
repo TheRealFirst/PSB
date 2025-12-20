@@ -12,6 +12,8 @@
 #include <string>
 #include <iostream>
 
+#include "AssetManagementHelpers.h"
+
 bool PSB::AssetManager::LoadGeometry(const std::filesystem::path& path, std::vector<float>& pointData, std::vector<uint32_t>& indexData, int dimensions)
 {
     std::ifstream file(path);
@@ -160,19 +162,19 @@ WGPUShaderModule PSB::AssetManager::LoadShaderModule(const std::filesystem::path
     return wgpuDeviceCreateShaderModule(device, &shaderDesc);
 }
 
-WGPUTexture PSB::AssetManager::LoadTexture(const std::filesystem::path& path, WGPUDevice device, WGPUTextureView* pTextureView = nullptr)
+WGPUTexture PSB::AssetManager::LoadTexture(const std::filesystem::path& path, WGPUDevice device, WGPUTextureView* pTextureView)
 {
     int width, height, channels;
-    unsigned char* pixelData = stbi_load(path.string().c_str(), &width, &height, &channels, 0);
+    unsigned char* pixelData = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
     if (pixelData == nullptr) return nullptr;
 
     WGPUTextureDescriptor textureDesc = {};
     textureDesc.nextInChain = nullptr;
     textureDesc.dimension = WGPUTextureDimension_2D;
     textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
-    textureDesc.mipLevelCount = 1;
     textureDesc.sampleCount = 1;
     textureDesc.size = { (unsigned int)width, (unsigned int)height, 1 };
+    textureDesc.mipLevelCount = bit_width(std::max(textureDesc.size.width, textureDesc.size.height));
     textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
     textureDesc.viewFormatCount = 0;
     textureDesc.viewFormats = nullptr;
@@ -183,7 +185,7 @@ WGPUTexture PSB::AssetManager::LoadTexture(const std::filesystem::path& path, WG
     stbi_image_free(pixelData);
 
     if (pTextureView) {
-        WGPUTextureViewDescriptor textureViewDesc;
+        WGPUTextureViewDescriptor textureViewDesc{};
         textureViewDesc.aspect = WGPUTextureAspect_All;
         textureViewDesc.baseArrayLayer = 0;
         textureViewDesc.arrayLayerCount = 1;
@@ -198,19 +200,4 @@ WGPUTexture PSB::AssetManager::LoadTexture(const std::filesystem::path& path, WG
     return texture;
 }
 
-static void writeMipMaps(WGPUDevice device, WGPUTexture texture, WGPUExtent3D textureSize, [[maybe_unused]] uint32_t mipLevelCount, const unsigned char* pixelData) {
-    WGPUImageCopyTexture destination{};
-    destination.texture = texture;
-    destination.mipLevel = 0;
-    destination.origin = { 0, 0, 0 };
-    destination.aspect = WGPUTextureAspect_All;
 
-    WGPUTextureDataLayout source{};
-    source.offset = 0;
-    source.bytesPerRow = 4 * textureSize.width;
-    source.rowsPerImage = textureSize.height;
-
-    WGPUQueue queue = wgpuDeviceGetQueue(device);
-    wgpuQueueWriteTexture(queue, &destination, pixelData, 4 * textureSize.width * textureSize.height, &source, textureSize);
-    wgpuQueueRelease(queue);
-}

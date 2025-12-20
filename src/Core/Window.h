@@ -38,6 +38,7 @@ namespace PSB
 		virtual bool IsVSync() const = 0;
 
 		virtual void* GetNativeWindow() const = 0;
+		virtual Ref<GraphicsContext> GetGraphicsContext() const = 0;
 
 		static Scope<Window> Create(const WindowProbs& props = WindowProbs());
 	};

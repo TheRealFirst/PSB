@@ -27,7 +27,7 @@ PSB::WindowsWindow::~WindowsWindow()
 void PSB::WindowsWindow::OnUpdate()
 {
     glfwPollEvents();
-    m_Context->SwapBuffers();
+    m_Context->OnFrame();
 }
 
 void PSB::WindowsWindow::SetVSync(bool enabled)
@@ -47,7 +47,7 @@ void PSB::WindowsWindow::Init(const WindowProbs& probs)
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
 	if (s_GLFWWindowCount == 0)
 	{
@@ -60,7 +60,7 @@ void PSB::WindowsWindow::Init(const WindowProbs& probs)
 	++s_GLFWWindowCount;
 
 	m_Context = CreateScope<GraphicsContext>(m_Window);
-	m_Context->Init(m_Data.Width, m_Data.Height);
+	LOG_ASSERT(m_Context->Init(m_Data.Width, m_Data.Height));
 
 
 	if (m_Window == NULL)

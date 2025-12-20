@@ -18,11 +18,13 @@ namespace PSB
 		GraphicsContext(GLFWwindow* windowHandle);
 		~GraphicsContext() = default;
 
-		void Init(uint32_t width, uint32_t height);
+		bool Init(uint32_t width, uint32_t height);
 		void Delete();
-		void SwapBuffers();
+		void OnFrame();
 
 		void SetClearColor(glm::vec4 clearColor);
+
+		void OnWindowResize(uint32_t width, uint32_t height);
 	private:
 		// Internal structures
 		struct MyUniforms {
@@ -41,10 +43,37 @@ namespace PSB
 		WGPUAdapter RequestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const* options);
 		WGPUDevice RequestDeviceSync(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
 		std::pair<WGPUSurfaceTexture, WGPUTextureView> GetNextSurfaceViewData();
-		void InitializePipeline();
-		void InitializeBuffers();
+		
 		WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter) const;
-		void InitializeBindGroups();
+		
+
+		bool InitializeWindowAndDevice();
+		void TerminateWindowAndDevice();
+
+		bool InitializeSwapChain();
+		void TerminateSwapChain();
+
+		bool InitializeAttachments();
+
+		bool InitializeDepthBuffer();
+		void TerminateDepthBuffer();
+
+		bool InitializePipeline();
+		void TerminatePipeline();
+
+		bool InitializeTexture();
+		void TerminateTextures();
+
+		bool InitializeGeometry();
+		void TerminateGeometry();
+
+		bool InitializeUniforms();
+		void TerminateUniforms();
+
+		bool InitializeBindGroups();
+		void TerminateBindGroups();
+
+		void UpdateProjectionMatrix();
 	private:
 		uint32_t m_Width;
 		uint32_t m_Height;
@@ -62,23 +91,26 @@ namespace PSB
 		WGPURenderPassColorAttachment m_ColorAttachment{};
 		WGPURenderPassDescriptor m_RenderPassDesc{};
 
+		WGPUShaderModule m_ShaderModule = nullptr;
+		
+
 
 		glm::vec4 m_ClearColor{0.01f, 0.01f, 0.01f, 1.0f};
 
 		WGPUBuffer m_VertexBuffer = nullptr;
 	
 
-		uint32_t m_IndexCount;
+		uint32_t m_VertexCount;
 
-		WGPUBuffer m_UniformBuffer;
-		WGPUPipelineLayout m_Layout;
-		WGPUBindGroupLayout m_BindGroupLayout;
-		WGPUBindGroup m_BindGroup;
-		uint32_t m_UniformStride;
+		WGPUBuffer m_UniformBuffer = nullptr;
+		WGPUPipelineLayout m_Layout = nullptr;
+		WGPUBindGroupLayout m_BindGroupLayout = nullptr;
+		WGPUBindGroup m_BindGroup = nullptr;
 
 		WGPUTexture m_DepthTexture = nullptr;
 		WGPUTextureView m_DepthTextureView = nullptr;
 		WGPURenderPassDepthStencilAttachment m_DepthStencilAttachment = nullptr;
+		WGPUTextureFormat m_DepthTextureFormat = WGPUTextureFormat_Depth24Plus;
 
 		MyUniforms m_Uniforms;
 

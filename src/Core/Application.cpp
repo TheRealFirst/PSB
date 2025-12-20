@@ -86,6 +86,7 @@ namespace PSB
 			return false;
 		}
 
+		m_Window->GetGraphicsContext()->OnWindowResize(e.GetWidth(), e.GetHeight());
 		m_Minimized = false;
 
 		return false;
