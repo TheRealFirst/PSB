@@ -5,6 +5,8 @@
 #include "Events\MouseEvent.h"
 #include "Core\Application.h"
 
+#include <iostream>
+
 static uint8_t s_GLFWWindowCount = 0;
 
 static void GLFWErrorCallback(int error, const char* description)
@@ -41,9 +43,6 @@ bool PSB::WindowsWindow::IsVSync() const
 
 void PSB::WindowsWindow::Init(const WindowProbs& probs)
 {
-	m_Data.Title = probs.Title;
-	m_Data.Width = probs.Width;
-	m_Data.Height = probs.Height;
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
@@ -56,7 +55,20 @@ void PSB::WindowsWindow::Init(const WindowProbs& probs)
 		glfwSetErrorCallback(GLFWErrorCallback);
 	}
 
-	m_Window = glfwCreateWindow((int)probs.Width, (int)probs.Height, probs.Title.c_str(), nullptr, nullptr);
+
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+
+    int width;
+    int height;
+
+    glfwGetMonitorWorkarea(monitor, NULL, NULL, &width, &height);
+
+
+    m_Data.Title = probs.Title;
+    m_Data.Width = probs.Width > width ? width - 100 : probs.Width;
+    m_Data.Height = probs.Height > height ? height - 100 : probs.Height;
+
+	m_Window = glfwCreateWindow((int)m_Data.Width, (int)m_Data.Height, probs.Title.c_str(), nullptr, nullptr);
 	++s_GLFWWindowCount;
 
 	m_Context = CreateScope<GraphicsContext>(m_Window);
