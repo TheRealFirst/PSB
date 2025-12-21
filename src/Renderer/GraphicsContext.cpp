@@ -734,8 +734,8 @@ namespace PSB
 
 		glfwGetMonitorWorkarea(monitor, NULL, NULL, &width, &height);
 
-        requiredLimits.limits.maxTextureDimension1D = height;
-        requiredLimits.limits.maxTextureDimension2D = width;
+        requiredLimits.limits.maxTextureDimension1D = (height > 2048 ? height : 2048);
+        requiredLimits.limits.maxTextureDimension2D = (width > 2048 ? width : 2048);
         requiredLimits.limits.maxTextureArrayLayers = 1;
 
         requiredLimits.limits.maxSampledTexturesPerShaderStage = 1;

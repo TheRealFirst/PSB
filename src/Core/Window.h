@@ -14,7 +14,7 @@ namespace PSB
 		uint32_t Width;
 		uint32_t Height;
 
-		WindowProbs(const std::string& title = "PSB", uint32_t width = 3840, uint32_t height = 2160)
+		WindowProbs(const std::string& title = "PSB", uint32_t width = 1920, uint32_t height = 1080)
 			: Title(title), Width(width), Height(height)
 		{
 		}
