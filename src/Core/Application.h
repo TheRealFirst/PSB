@@ -9,6 +9,8 @@
 
 #include "Renderer\Renderer.h"
 
+#include "GUI/GUI.h"
+
 #include <tinyLog/Log.h>
 #include <webgpu/webgpu.h>
 
@@ -62,6 +64,7 @@ namespace PSB
 		float m_LastFrameTime = 0.0f;
 
 		LayerStack m_LayerStack;
+		GUI::GUILayer* m_GuiLayer;
 
 		Ref<GraphicsContext> m_Context;
 	private:

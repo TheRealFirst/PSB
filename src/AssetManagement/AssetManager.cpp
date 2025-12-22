@@ -72,7 +72,7 @@ bool PSB::AssetManager::LoadGeometry(const std::filesystem::path& path, std::vec
     return true;
 }
 
-bool PSB::AssetManager::LoadGeometryFromObj(const std::filesystem::path& path, std::vector<VertexAttributes>& vertexData)
+bool PSB::AssetManager::LoadGeometryFromObj(const std::filesystem::path& path, std::vector<VertexAttributes3D>& vertexData)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;

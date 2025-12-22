@@ -287,19 +287,19 @@ namespace PSB
 
 		vertexAttribs[0].shaderLocation = 0;
 		vertexAttribs[0].format = WGPUVertexFormat_Float32x3;
-		vertexAttribs[0].offset = offsetof(VertexAttributes, position);
+		vertexAttribs[0].offset = offsetof(VertexAttributes3D, position);
 
 		vertexAttribs[1].shaderLocation = 1;
 		vertexAttribs[1].format = WGPUVertexFormat_Float32x3;
-		vertexAttribs[1].offset = offsetof(VertexAttributes, normal);
+		vertexAttribs[1].offset = offsetof(VertexAttributes3D, normal);
 
 		vertexAttribs[2].shaderLocation = 2;
 		vertexAttribs[2].format = WGPUVertexFormat_Float32x3;
-		vertexAttribs[2].offset = offsetof(VertexAttributes, color);
+		vertexAttribs[2].offset = offsetof(VertexAttributes3D, color);
 
 		vertexAttribs[3].shaderLocation = 3;
 		vertexAttribs[3].format = WGPUVertexFormat_Float32x2;
-		vertexAttribs[3].offset = offsetof(VertexAttributes, uv);
+		vertexAttribs[3].offset = offsetof(VertexAttributes3D, uv);
 
 
         WGPUVertexBufferLayout vertexBufferLayout{};
@@ -307,7 +307,7 @@ namespace PSB
 		vertexBufferLayout.attributeCount = static_cast<uint32_t>(vertexAttribs.size());
 		vertexBufferLayout.attributes = vertexAttribs.data();
 
-		vertexBufferLayout.arrayStride = sizeof(VertexAttributes);
+		vertexBufferLayout.arrayStride = sizeof(VertexAttributes3D);
 		vertexBufferLayout.stepMode = WGPUVertexStepMode_Vertex;
 
 		// We do not use any vertex buffer for this first simplistic example
@@ -476,7 +476,7 @@ namespace PSB
 
     bool GraphicsContext::InitializeGeometry() 
     {
-		std::vector<VertexAttributes> vertexData;
+		std::vector<VertexAttributes3D> vertexData;
 
 		bool success = AssetManager::LoadGeometryFromObj(RESOURCE_DIR "/fourareen/fourareen.obj", vertexData);
 
@@ -488,7 +488,7 @@ namespace PSB
 
 		WGPUBufferDescriptor bufferDesc{};
 		bufferDesc.nextInChain = nullptr;
-		bufferDesc.size = vertexData.size() * sizeof(VertexAttributes);
+		bufferDesc.size = vertexData.size() * sizeof(VertexAttributes3D);
 		bufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
 		bufferDesc.mappedAtCreation = false;
 		m_VertexBuffer = wgpuDeviceCreateBuffer(m_Device, &bufferDesc);
@@ -813,7 +813,7 @@ namespace PSB
         // Maximum size of a buffer is 6 vertices of 2 float each
         requiredLimits.limits.maxBufferSize = supportedLimits.limits.maxBufferSize;
         // Maximum stride between 2 consecutive vertices in the vertex buffer
-        requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttributes);
+        requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttributes3D);
 
         requiredLimits.limits.maxInterStageShaderComponents = 8;
 

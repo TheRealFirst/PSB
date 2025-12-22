@@ -12,6 +12,8 @@ struct GLFWwindow;
 #include "Events/MouseEvent.h"
 #include "Events/KeyEvent.h"
 
+#include "Renderer/Vertex.h"
+
 namespace PSB
 {
 	class GraphicsContext

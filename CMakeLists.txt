@@ -21,7 +21,7 @@ file(GLOB_RECURSE PSB_SOURCES CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
 
-add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Layer.h" "src/Core/Layer.cpp" "src/Core/Timestep.h" "src/Core/Layerstack.h" "src/Core/Layerstack.cpp" "src/Core/EntryPoint.h" "src/Renderer/Renderer.h" "src/Renderer/Renderer.cpp" "src/Renderer/Renderer2D.h" "src/Renderer/Renderer2D.cpp"     "src/AssetManagement/AssetManager.h" "src/AssetManagement/AssetManager.cpp" "src/Renderer/RendererUtils.h" "src/Renderer/RendererUtils.cpp" "dependencies/TinyOBJLoader/tiny_obj_loader.h" "dependencies/stb_image/stb_image.h" "src/AssetManagement/AssetManagementHelpers.h")
+add_library(PSB STATIC ${PSB_SOURCES} "src/Core/Layer.h" "src/Core/Layer.cpp" "src/Core/Timestep.h" "src/Core/Layerstack.h" "src/Core/Layerstack.cpp" "src/Core/EntryPoint.h" "src/Renderer/Renderer.h" "src/Renderer/Renderer.cpp" "src/Renderer/Renderer2D.h" "src/Renderer/Renderer2D.cpp"     "src/AssetManagement/AssetManager.h" "src/AssetManagement/AssetManager.cpp" "src/Renderer/RendererUtils.h" "src/Renderer/RendererUtils.cpp" "dependencies/TinyOBJLoader/tiny_obj_loader.h" "dependencies/stb_image/stb_image.h" "src/AssetManagement/AssetManagementHelpers.h" "src/GUI/GUI.h" "src/GUI/GUI.cpp" "src/GUI/GUIShape.h" "src/GUI/GUIShape.cpp" "src/GUI/GUIItem.h" "src/GUI/GUIItem.cpp")
 
 target_include_directories(PSB PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src

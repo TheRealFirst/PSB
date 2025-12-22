@@ -17,6 +17,9 @@ namespace PSB
 		m_Window = Window::Create();
 		m_Context = m_Window->GetGraphicsContext();
 		m_Window->SetEventCallback(PSB_BIND_EVENT_FN(Application::OnEvent));
+
+		m_GuiLayer = new GUI::GUILayer();
+		PushOverlay(m_GuiLayer);
 	}
 
 	PSB::Application::~Application()
