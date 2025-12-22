@@ -9,6 +9,11 @@
 #include <webgpu/webgpu.h>
 #include <webgpu/wgpu.h>
 
+#include "Core/Input.h"
+#include "Core/KeyCodes.h"
+#include "Core/MouseCodes.h"
+
+
 #include <glm/matrix.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -47,7 +52,66 @@ namespace PSB
 		return true;
     }
 
-    bool GraphicsContext::InitializeWindowAndDevice()
+	void GraphicsContext::OnEvent(Event& e)
+	{
+		EventDispatcher dispatcher(e);
+		dispatcher.Dispatch<MouseScrolledEvent>(PSB_BIND_EVENT_FN(GraphicsContext::OnMouseScroll));
+		dispatcher.Dispatch<MouseButtonPressedEvent>(PSB_BIND_EVENT_FN(GraphicsContext::OnMouseButtonPressed));
+		dispatcher.Dispatch<MouseButtonReleasedEvent>(PSB_BIND_EVENT_FN(GraphicsContext::OnMouseButtonReleased));
+		dispatcher.Dispatch<MouseMovedEvent>(PSB_BIND_EVENT_FN(GraphicsContext::OnMouseMoved));
+	}
+
+	bool GraphicsContext::OnMouseScroll(MouseScrolledEvent& e)
+	{
+		m_CameraState.zoom += m_DragState.scrollSensitivity * e.GetYOffset();
+		m_CameraState.zoom = glm::clamp(m_CameraState.zoom, -2.0f, 2.0f);
+		UpdateViewMatrix();
+		return true;
+	}
+
+	bool GraphicsContext::OnMouseButtonPressed(MouseButtonPressedEvent& e)
+	{
+		if (e.GetMouseButton() == Mouse::Button0)
+		{
+			m_DragState.active = true;
+			float xpos, ypos;
+			m_DragState.startMouse = glm::vec2(Input::GetMouseX(), Input::GetMouseY());
+			m_DragState.startCameraState = m_CameraState;
+			return true;
+		}
+		return false;
+	}
+
+	bool GraphicsContext::OnMouseButtonReleased(MouseButtonReleasedEvent& e)
+	{
+		if (e.GetMouseButton() == Mouse::Button0 && m_DragState.active)
+		{
+			m_DragState.active = false;
+			return true;
+		}
+		return false;
+	}
+
+	bool GraphicsContext::OnMouseMoved(MouseMovedEvent& e)
+	{
+		if (m_DragState.active)
+		{
+			glm::vec2 currentMouse = e.GetPos();
+			glm::vec2 delta = (currentMouse - m_DragState.startMouse) * m_DragState.sensitivity;
+			m_CameraState.angles = m_DragState.startCameraState.angles + delta;
+
+			m_CameraState.angles.y = glm::clamp(m_CameraState.angles.y, -PI / 2 + 1e-5f, PI / 2 - 1e-5f);
+			UpdateViewMatrix();
+
+			m_DragState.velocity = delta - m_DragState.previosDelta;
+			m_DragState.previosDelta = delta;
+
+			return true;
+		}
+		return false;
+	}
+
+	bool GraphicsContext::InitializeWindowAndDevice()
     {
 		WGPUInstanceDescriptor desc{};
 		m_Instance = wgpuCreateInstance(&desc);
@@ -464,6 +528,7 @@ namespace PSB
 
 		wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, 0, &m_Uniforms, sizeof(MyUniforms));
 
+		UpdateViewMatrix();
 		return m_UniformBuffer != nullptr;
     }
 
@@ -517,6 +582,35 @@ namespace PSB
 		wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, offsetof(MyUniforms, projectionMatrix), &m_Uniforms.projectionMatrix, sizeof(MyUniforms::projectionMatrix));
 	}
 
+	void GraphicsContext::UpdateViewMatrix()
+	{
+		float cx = cos(m_CameraState.angles.x);
+		float sx = sin(m_CameraState.angles.x);
+		float cy = cos(m_CameraState.angles.y);
+		float sy = sin(m_CameraState.angles.y);
+		glm::vec3 position = glm::vec3(cx * cy, sx * cy, sy) * std::exp(-m_CameraState.zoom);
+		m_Uniforms.viewMatrix = glm::lookAt(position, glm::vec3(0.0f), glm::vec3(0, 0, 1));
+		wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, offsetof(MyUniforms, viewMatrix), &m_Uniforms.viewMatrix, sizeof(MyUniforms::viewMatrix));
+	}
+
+	void GraphicsContext::UpdateDragInertia()
+	{
+		constexpr float eps = 1e-4f;
+
+		if (!m_DragState.active)
+		{
+			if (std::abs(m_DragState.velocity.x) < eps && std::abs(m_DragState.velocity.y) < eps)
+			{
+				return;
+			}
+			m_CameraState.angles += m_DragState.velocity;
+			m_CameraState.angles.y = glm::clamp(m_CameraState.angles.y, -PI / 2 + 1e-5f, PI / 2 - 1e-5f);
+
+			m_DragState.velocity *= m_DragState.inertia;
+			UpdateViewMatrix();
+		}
+	}
+
 	void PSB::GraphicsContext::Delete()
     {
 		TerminateBindGroups();
@@ -531,6 +625,7 @@ namespace PSB
 
     void PSB::GraphicsContext::OnFrame()
     {
+		UpdateDragInertia();
         // wgpuQueueWriteBuffer(m_Queue, m_UniformBuffer, offsetof(MyUniforms, modelMatrix), &m_Uniforms.modelMatrix, sizeof(glm::mat4));
 
         auto [surfaceTexture, targetView] = GetNextSurfaceViewData();
@@ -732,7 +827,7 @@ namespace PSB
 		int width;
 		int height;
 
-		glfwGetMonitorWorkarea(monitor, NULL, NULL, &width, &height);
+		glfwGetMonitorWorkarea(monitor, nullptr, nullptr, &width, &height);
 
         requiredLimits.limits.maxTextureDimension1D = (height > 2048 ? height : 2048);
         requiredLimits.limits.maxTextureDimension2D = (width > 2048 ? width : 2048);

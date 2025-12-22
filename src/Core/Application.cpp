@@ -15,6 +15,7 @@ namespace PSB
 		WindowProbs probs;
 
 		m_Window = Window::Create();
+		m_Context = m_Window->GetGraphicsContext();
 		m_Window->SetEventCallback(PSB_BIND_EVENT_FN(Application::OnEvent));
 	}
 

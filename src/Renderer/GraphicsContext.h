@@ -8,6 +8,9 @@
 #include <glm\glm.hpp>
 
 struct GLFWwindow;
+#include "Events/Event.h"
+#include "Events/MouseEvent.h"
+#include "Events/KeyEvent.h"
 
 namespace PSB
 {
@@ -25,6 +28,7 @@ namespace PSB
 		void SetClearColor(glm::vec4 clearColor);
 
 		void OnWindowResize(uint32_t width, uint32_t height);
+		void OnEvent(Event& e);
 	private:
 		// Internal structures
 		struct MyUniforms {
@@ -36,9 +40,34 @@ namespace PSB
 			float _pad[3];
 		};
 
+		struct CameraState
+		{
+			glm::vec2 angles = { 0.8f, 0.5f };
+			float zoom = -1.2f;
+		};
+
+		struct DragState
+		{
+			bool active = false;
+			glm::vec2 startMouse;
+			CameraState startCameraState;
+
+			float sensitivity = 0.01f;
+			float scrollSensitivity = 0.1f;
+
+			glm::vec2 velocity = { 0.0f, 0.0f };
+			glm::vec2 previosDelta;
+			float inertia = 0.6f;
+		};
 
 		static_assert(sizeof(MyUniforms) % 16 == 0);
 	private:
+		bool OnMouseScroll(MouseScrolledEvent& e);
+		bool OnMouseButtonPressed(MouseButtonPressedEvent&e);
+		bool OnMouseButtonReleased(MouseButtonReleasedEvent&e);
+		bool OnMouseMoved(MouseMovedEvent& e);
+
+
 		//Internal functions
 		WGPUAdapter RequestAdapterSync(WGPUInstance instance, WGPURequestAdapterOptions const* options);
 		WGPUDevice RequestDeviceSync(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
@@ -74,6 +103,9 @@ namespace PSB
 		void TerminateBindGroups();
 
 		void UpdateProjectionMatrix();
+		void UpdateViewMatrix();
+
+		void UpdateDragInertia();
 	private:
 		uint32_t m_Width;
 		uint32_t m_Height;
@@ -117,5 +149,8 @@ namespace PSB
 		WGPUTexture m_Texture = nullptr;
 		WGPUTextureView m_TextureView = nullptr;
 		WGPUSampler m_Sampler = nullptr;
+
+		CameraState m_CameraState;
+		DragState m_DragState;
 	};
 }

@@ -2,6 +2,8 @@
 
 #include "Event.h"
 #include "../Core/MouseCodes.h"
+#include <sstream>
+#include <glm/glm.hpp>
 
 namespace PSB {
 
@@ -13,6 +15,8 @@ namespace PSB {
 
 		float GetX() const { return m_MouseX; }
 		float GetY() const { return m_MouseY; }
+
+		glm::vec2 GetPos() const { return glm::vec2(m_MouseX, m_MouseY); }
 
 		std::string ToString() const override
 		{

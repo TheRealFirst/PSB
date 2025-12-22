@@ -61,7 +61,7 @@ void PSB::WindowsWindow::Init(const WindowProbs& probs)
     int width;
     int height;
 
-    glfwGetMonitorWorkarea(monitor, NULL, NULL, &width, &height);
+    glfwGetMonitorWorkarea(monitor, nullptr, nullptr, &width, &height);
 
 
     m_Data.Title = probs.Title;
@@ -179,7 +179,7 @@ void PSB::WindowsWindow::Init(const WindowProbs& probs)
 
 void PSB::WindowsWindow::Shutdown()
 {
+    m_Context->Delete();
 	glfwDestroyWindow(m_Window);
 	glfwTerminate();
-	m_Context->Delete();
 }
