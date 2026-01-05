@@ -44,6 +44,7 @@ namespace PSB
 		Window& GetWindow() { return *m_Window; }
 
 		Ref<GraphicsContext> GetContext() { return m_Context; }
+		GUI::GUILayer* GetGUILayer() { return m_GuiLayer; }
 
 		void Close();
 

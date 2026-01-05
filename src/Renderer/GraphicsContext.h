@@ -31,6 +31,10 @@ namespace PSB
 
 		void OnWindowResize(uint32_t width, uint32_t height);
 		void OnEvent(Event& e);
+
+		WGPUDevice GetDevice() { return m_Device; }
+		WGPUTextureFormat GetTextureFormat() { return m_SurfaceFormat; }
+		WGPUQueue GetQueue() { return m_Queue; }
 	private:
 		// Internal structures
 		struct MyUniforms {
@@ -154,5 +158,9 @@ namespace PSB
 
 		CameraState m_CameraState;
 		DragState m_DragState;
+
+
+		WGPURenderPassColorAttachment m_UIPassColorAttachment{};
+		WGPURenderPassDescriptor m_UIRenderPassDesc{};
 	};
 }

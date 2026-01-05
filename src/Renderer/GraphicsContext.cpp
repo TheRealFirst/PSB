@@ -234,6 +234,18 @@ namespace PSB
 		m_DepthStencilAttachment.stencilReadOnly = true;
 		m_RenderPassDesc.depthStencilAttachment = &m_DepthStencilAttachment;
 
+
+		m_UIPassColorAttachment = {};
+		m_UIPassColorAttachment.view = nullptr; // set per frame
+		m_UIPassColorAttachment.resolveTarget = nullptr;
+		m_UIPassColorAttachment.loadOp = WGPULoadOp_Load;
+		m_UIPassColorAttachment.storeOp = WGPUStoreOp_Store;
+		
+		m_UIRenderPassDesc = {};
+		m_UIRenderPassDesc.colorAttachmentCount = 1;
+		m_UIRenderPassDesc.colorAttachments = &m_UIPassColorAttachment;
+		m_UIRenderPassDesc.depthStencilAttachment = nullptr;
+
         return true;
     }
 
@@ -642,15 +654,12 @@ namespace PSB
         m_DepthStencilAttachment.view = m_DepthTextureView;
 
 
-
-
         // Create the render pass and end it immediately (we only clear the screen but do not draw anything)
         WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &m_RenderPassDesc);
 
         wgpuRenderPassEncoderSetPipeline(renderPass, m_Pipeline);
 
         wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, m_VertexBuffer, 0, wgpuBufferGetSize(m_VertexBuffer));
-        // m_IndexBuffer.Bind(renderPass);
 
 
         uint32_t dynamicOffset = 0;
@@ -665,6 +674,16 @@ namespace PSB
 
         wgpuRenderPassEncoderEnd(renderPass);
         wgpuRenderPassEncoderRelease(renderPass);
+
+		m_UIPassColorAttachment.view = targetView;
+
+
+		WGPURenderPassEncoder uiPass = wgpuCommandEncoderBeginRenderPass(encoder, &m_UIRenderPassDesc);
+
+		Application::Get().GetGUILayer()->Render(uiPass);
+
+		wgpuRenderPassEncoderEnd(uiPass);
+		wgpuRenderPassEncoderRelease(uiPass);
 
         // Finally encode and submit the render pass
         WGPUCommandBufferDescriptor cmdBufferDescriptor = {};

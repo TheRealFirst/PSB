@@ -19,6 +19,7 @@ namespace PSB
 		m_Window->SetEventCallback(PSB_BIND_EVENT_FN(Application::OnEvent));
 
 		m_GuiLayer = new GUI::GUILayer();
+		m_GuiLayer->Init(m_Window->GetWidth(), m_Window->GetHeight());
 		PushOverlay(m_GuiLayer);
 	}
 
@@ -91,6 +92,7 @@ namespace PSB
 		}
 
 		m_Window->GetGraphicsContext()->OnWindowResize(e.GetWidth(), e.GetHeight());
+		m_GuiLayer->OnResize(e.GetWidth(), e.GetHeight());
 		m_Minimized = false;
 
 		return false;
